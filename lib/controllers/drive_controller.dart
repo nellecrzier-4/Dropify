@@ -2,7 +2,6 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:file_picker/file_picker.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:flutter/foundation.dart';
 
 import '../models/pd_item.dart';
@@ -102,7 +101,6 @@ class DriveController extends ChangeNotifier {
 
     final parts = (size / maxPartSize).ceil();
     task.parts = parts;
-    final temp = await getTemporaryDirectory();
     final dot = name.lastIndexOf('.');
     final stem = dot > 0 ? name.substring(0, dot) : name;
     final ext = dot > 0 ? name.substring(dot) : '';
@@ -115,44 +113,12 @@ class DriveController extends ChangeNotifier {
       notifyListeners();
 
       final partName = '$stem.part${i + 1}$ext';
-      final partFile = File('${temp.path}/$partName');
-      await _copyRange(file, partFile, start, end);
-
       final base = uploaded;
-      try {
-        await api.uploadFile(partFile.path, partName, (sent, total) {
-          onProgress(base + sent, size);
-        });
-        uploaded += end - start;
-      } finally {
-        // Cache selalu dibersihkan, termasuk kalau upload gagal.
-        try {
-          if (await partFile.exists()) await partFile.delete();
-        } catch (_) {}
-      }
-    }
-  }
-
-  Future<void> _copyRange(File source, File target, int start, int end) async {
-    final input = await source.open();
-    final output = await target.open(mode: FileMode.write);
-    try {
-      await input.setPosition(start);
-      var remaining = end - start;
-      final buffer = Uint8List(1024 * 1024);
-      while (remaining > 0) {
-        final read = await input.readInto(
-          buffer,
-          0,
-          math.min(buffer.length, remaining),
-        );
-        if (read <= 0) break;
-        await output.writeFrom(buffer, 0, read);
-        remaining -= read;
-      }
-    } finally {
-      await input.close();
-      await output.close();
+      // Dialirkan langsung dari file asli — tidak ada salinan di cache.
+      await api.uploadRange(file, start, end, partName, (sent, total) {
+        onProgress(base + sent, size);
+      });
+      uploaded += end - start;
     }
   }
 
