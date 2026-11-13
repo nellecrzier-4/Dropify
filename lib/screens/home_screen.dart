@@ -136,40 +136,136 @@ class _HomeScreenState extends State<HomeScreen> {
           PhotosTab(ctrl: _ctrl),
         ],
       ),
-      floatingActionButton: SizedBox(
-        width: 64,
-        height: 64,
-        child: FloatingActionButton(
-          onPressed: _showAddMenu,
-          backgroundColor: AppColors.primary,
-          foregroundColor: AppColors.onPrimary,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-          child: const Icon(Icons.add, size: 32),
-        ),
-      ),
-      bottomNavigationBar: ColoredBox(
-        color: AppColors.bg,
-        child: SafeArea(
-          top: false,
-          child: NavigationBar(
-            selectedIndex: _index,
-            onDestinationSelected: (i) {
-              setState(() => _index = i);
-              // Segarkan saat pindah tab supaya upload baru langsung terlihat.
-              if (!_ctrl.loading) _ctrl.refresh();
-            },
-            destinations: [
-              const NavigationDestination(
-                  icon: Icon(Icons.home), label: 'Home'),
-              NavigationDestination(
-                  icon: const Icon(Icons.folder_open), label: s.files),
-              NavigationDestination(
-                  icon: const Icon(Icons.photo_library_outlined),
-                  label: s.photos),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 6, 16, 14),
+          child: Row(
+            children: [
+              Expanded(
+                child: _FloatingNav(
+                  index: _index,
+                  labels: [s.home, s.files, s.photos],
+                  onSelect: (i) {
+                    setState(() => _index = i);
+                    if (!_ctrl.loading) _ctrl.refresh();
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              _FabCircle(onTap: _showAddMenu),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+
+class _FloatingNav extends StatelessWidget {
+  const _FloatingNav({
+    required this.index,
+    required this.labels,
+    required this.onSelect,
+  });
+
+  final int index;
+  final List<String> labels;
+  final ValueChanged<int> onSelect;
+
+  static const _icons = [Icons.home_rounded, Icons.folder_rounded, Icons.photo_rounded];
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 66,
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: AppColors.cardHigh,
+        borderRadius: BorderRadius.circular(36),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.35),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          for (var i = 0; i < labels.length; i++)
+            Expanded(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => onSelect(i),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 260),
+                  curve: Curves.easeOutCubic,
+                  decoration: BoxDecoration(
+                    color: i == index ? AppColors.primary : Colors.transparent,
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        _icons[i],
+                        size: 22,
+                        color: i == index
+                            ? AppColors.onPrimary
+                            : AppColors.muted,
+                      ),
+                      if (i == index) ...[
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            labels[i],
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: AppColors.onPrimary,
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FabCircle extends StatelessWidget {
+  const _FabCircle({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 66,
+        height: 66,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: AppColors.primary,
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withOpacity(0.35),
+              blurRadius: 22,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Icon(Icons.add, size: 30, color: AppColors.onPrimary),
       ),
     );
   }

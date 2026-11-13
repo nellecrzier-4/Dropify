@@ -52,6 +52,7 @@ abstract class AppStrings {
   String get english;
   String get languageSubtitle;
   String get settings;
+  String get home;
   String get appearance;
   String get dynamicColor;
   String get dynamicColorHint;
@@ -331,6 +332,9 @@ class StringsId extends AppStrings {
 
   @override
   String get settings => 'Pengaturan';
+
+  @override
+  String get home => 'Home';
 
   @override
   String get appearance => 'Tampilan';
@@ -878,6 +882,9 @@ class StringsEn extends AppStrings {
 
   @override
   String get settings => 'Settings';
+
+  @override
+  String get home => 'Home';
 
   @override
   String get appearance => 'Appearance';
