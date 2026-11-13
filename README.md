@@ -25,6 +25,8 @@ without opening a browser.
   be turned off; see *Notes* below.
 - **Resumable transfers** — files are fetched in small chunks over several
   connections and continue from the last byte if the connection drops.
+- **Background transfers** — a foreground service keeps uploads and downloads
+  running when you leave the app, with a low-priority notification.
 - **Saved to `Download/Dropify`** — files land in public storage and open with
   any app on the phone.
 - **Interface** — Indonesian and English, system colours (Material You), AMOLED

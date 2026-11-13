@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import '../models/pd_item.dart';
 import '../services/download_service.dart';
 import '../services/pixeldrain_api.dart';
+import '../services/transfer_session.dart';
 
 enum UploadStatus { uploading, done, error }
 
@@ -75,6 +76,7 @@ class DriveController extends ChangeNotifier {
   Future<void> pickAndUpload() async {
     final res = await FilePicker.platform.pickFiles(allowMultiple: true);
     if (res == null) return;
+    TransferSession.setUploadsActive(true, downloadsActive: downloads.hasActive);
     for (final f in res.files) {
       final path = f.path;
       if (path == null) continue;
@@ -116,6 +118,7 @@ class DriveController extends ChangeNotifier {
       }
       notifyListeners();
     }
+    TransferSession.setUploadsActive(false, downloadsActive: downloads.hasActive);
     await refresh();
   }
 

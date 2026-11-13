@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import '../models/pd_item.dart';
 import '../utils/file_types.dart';
 import 'app_settings.dart';
+import 'transfer_session.dart';
 import 'native_downloads.dart';
 import 'pixeldrain_api.dart';
 import 'pixeldrain_bypass.dart';
@@ -178,6 +179,7 @@ class DownloadService extends ChangeNotifier {
 
   int _seq = 0;
   bool _disposed = false;
+  DateTime _lastServiceUpdate = DateTime.fromMillisecondsSinceEpoch(0);
 
   int get activeCount => tasks.where((t) => t.isActive).length;
   bool get hasActive => activeCount > 0;
@@ -984,7 +986,25 @@ class DownloadService extends ChangeNotifier {
 
   void _notify() {
     if (_disposed) return;
+    _syncService();
     notifyListeners();
+  }
+
+  /// Foreground service: hidup selama ada transfer, mati saat semua selesai.
+  void _syncService() {
+    final active = tasks.where((t) => t.isActive).toList();
+    TransferSession.setDownloadsActive(active.isNotEmpty);
+    if (active.isEmpty) return;
+
+    final now = DateTime.now();
+    if (now.difference(_lastServiceUpdate).inMilliseconds < 1500) return;
+    _lastServiceUpdate = now;
+
+    final first = active.first;
+    final text = active.length == 1
+        ? '${first.name} · ${(first.progress * 100).round()}%'
+        : '${active.length} file · ${(first.progress * 100).round()}%';
+    NativeDownloads.updateTransferService(text);
   }
 
   @override

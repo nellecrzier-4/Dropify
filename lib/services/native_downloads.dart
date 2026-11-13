@@ -155,6 +155,24 @@ class NativeDownloads {
     } catch (_) {}
   }
 
+  static Future<void> startTransferService(String text) async {
+    try {
+      await _channel.invokeMethod<bool>('startTransferService', {'text': text});
+    } catch (_) {}
+  }
+
+  static Future<void> updateTransferService(String text) async {
+    try {
+      await _channel.invokeMethod<bool>('updateTransferService', {'text': text});
+    } catch (_) {}
+  }
+
+  static Future<void> stopTransferService() async {
+    try {
+      await _channel.invokeMethod<bool>('stopTransferService');
+    } catch (_) {}
+  }
+
   static Future<void> restartApp() async {
     try {
       await _channel.invokeMethod<bool>('restartApp');

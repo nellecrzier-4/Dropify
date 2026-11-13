@@ -99,6 +99,24 @@ class MainActivity : FlutterActivity() {
                             }
                             result.success(true)
                         }
+                        "startTransferService" -> {
+                            TransferService.start(
+                                this,
+                                call.argument<String>("text") ?: "Transfer berjalan",
+                            )
+                            result.success(true)
+                        }
+                        "updateTransferService" -> {
+                            TransferService.update(
+                                this,
+                                call.argument<String>("text") ?: "Transfer berjalan",
+                            )
+                            result.success(true)
+                        }
+                        "stopTransferService" -> {
+                            TransferService.stop(this)
+                            result.success(true)
+                        }
                         "restartApp" -> {
                             recreate()
                             result.success(true)
