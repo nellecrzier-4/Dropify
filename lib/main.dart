@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -5,6 +7,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'l10n/locale_controller.dart';
 import 'screens/start_screen.dart';
 import 'services/app_settings.dart';
+import 'services/cache_cleaner.dart';
 import 'theme/app_theme.dart';
 import 'theme/theme_controller.dart';
 
@@ -27,6 +30,8 @@ Future<void> main() async {
   await ThemeController.instance.load();
   await AppSettings.instance.load();
   await DownloadHistory.instance.load();
+  // Bersihkan sisa potongan upload dari sesi sebelumnya.
+  unawaited(CacheCleaner.clearUploadParts());
   runApp(const DropifyApp());
 }
 
