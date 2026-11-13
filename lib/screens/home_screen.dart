@@ -139,7 +139,7 @@ class _HomeScreenState extends State<HomeScreen> {
       bottomNavigationBar: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 6, 16, 14),
+          padding: const EdgeInsets.fromLTRB(18, 6, 18, 16),
           child: Row(
             children: [
               Expanded(
@@ -179,7 +179,7 @@ class _FloatingNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 66,
+      height: 64,
       padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
         color: AppColors.cardHigh,
@@ -252,8 +252,8 @@ class _FabCircle extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 66,
-        height: 66,
+        width: 64,
+        height: 64,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: AppColors.primary,

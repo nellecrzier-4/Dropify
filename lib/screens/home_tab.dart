@@ -153,6 +153,7 @@ class HomeTab extends StatelessWidget {
               ),
               const SizedBox(height: 24),
               Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   _QuickAction(
                     icon: Icons.upload_file_rounded,
@@ -163,13 +164,11 @@ class HomeTab extends StatelessWidget {
                       ctrl.pickAndUpload();
                     },
                   ),
-                  const SizedBox(width: 12),
                   _QuickAction(
                     icon: Icons.link_rounded,
                     label: s.download,
                     onTap: () => showTransfers(context, ctrl),
                   ),
-                  const SizedBox(width: 12),
                   _QuickAction(
                     icon: Icons.search_rounded,
                     label: s.files,
@@ -180,7 +179,6 @@ class HomeTab extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
                   _QuickAction(
                     icon: Icons.tune_rounded,
                     label: s.settings,
@@ -276,29 +274,32 @@ class _QuickAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
+    return SizedBox(
+      width: 76,
       child: Column(
         children: [
           GestureDetector(
             onTap: onTap,
             child: Container(
-              height: 56,
+              width: 62,
+              height: 62,
               decoration: BoxDecoration(
                 color: primary ? AppColors.primary : AppColors.cardHigh,
-                borderRadius: BorderRadius.circular(20),
+                shape: BoxShape.circle,
               ),
               child: Icon(
                 icon,
-                size: 24,
+                size: 26,
                 color: primary ? AppColors.onPrimary : AppColors.text,
               ),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 9),
           Text(
             label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
             style: const TextStyle(color: AppColors.muted, fontSize: 11.5),
           ),
         ],
