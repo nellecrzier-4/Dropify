@@ -1,0 +1,232 @@
+import 'package:flutter/services.dart';
+
+/// Hasil enqueue di DownloadManager Android.
+class NativeDownloadHandle {
+  const NativeDownloadHandle({
+    required this.id,
+    required this.name,
+    required this.path,
+  });
+
+  final int id;
+  final String name;
+
+  /// Path publik hasil download, mis. /storage/emulated/0/Download/Dropify/a.zip
+  final String path;
+}
+
+class NativeDownloadState {
+  const NativeDownloadState({
+    required this.state,
+    required this.received,
+    required this.total,
+    this.error,
+    this.uri,
+  });
+
+  /// pending | running | paused | done | failed | unknown
+  final String state;
+  final int received;
+  final int total;
+  final String? error;
+  final String? uri;
+
+  bool get isDone => state == 'done';
+  bool get isFailed => state == 'failed';
+  bool get isActive =>
+      state == 'running' || state == 'pending' || state == 'paused';
+
+  double get progress {
+    if (total <= 0) return 0;
+    return (received / total).clamp(0.0, 1.0);
+  }
+}
+
+class NativeDownloadException implements Exception {
+  NativeDownloadException(this.message);
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
+/// Jembatan ke DownloadManager Android (lihat MainActivity.kt).
+///
+/// Semua file mendarat di /storage/emulated/0/Download/Dropify dan progresnya
+/// tampil sebagai notifikasi sistem.
+class NativeDownloads {
+  static const MethodChannel _channel = MethodChannel('com.nel.dropify/native');
+
+  /// Folder tujuan yang dipakai aplikasi.
+  static const String subdir = 'Dropify';
+  static const String folderPath = '/storage/emulated/0/Download/Dropify';
+
+  static Future<NativeDownloadHandle> enqueue({
+    required String url,
+    required String name,
+    String? mime,
+    Map<String, String> headers = const {},
+  }) async {
+    try {
+      final res = await _channel.invokeMapMethod<String, dynamic>('enqueue', {
+        'url': url,
+        'name': name,
+        'mime': mime,
+        'subdir': subdir,
+        'headers': headers,
+      });
+      if (res == null) {
+        throw NativeDownloadException('Downloader tidak merespons.');
+      }
+      return NativeDownloadHandle(
+        id: (res['id'] as num).toInt(),
+        name: res['name']?.toString() ?? name,
+        path: res['path']?.toString() ?? folderPath,
+      );
+    } on PlatformException catch (e) {
+      throw NativeDownloadException(e.message ?? 'Gagal memulai download.');
+    } on MissingPluginException {
+      throw NativeDownloadException(
+          'Downloader Android tidak tersedia di perangkat ini.');
+    }
+  }
+
+  static Future<NativeDownloadState?> query(int id) async {
+    try {
+      final res = await _channel.invokeMapMethod<String, dynamic>('query', {'id': id});
+      if (res == null) return null;
+      return NativeDownloadState(
+        state: res['state']?.toString() ?? 'unknown',
+        received: (res['received'] as num?)?.toInt() ?? 0,
+        total: (res['total'] as num?)?.toInt() ?? 0,
+        error: res['error']?.toString(),
+        uri: res['uri']?.toString(),
+      );
+    } on PlatformException {
+      return null;
+    } on MissingPluginException {
+      return null;
+    }
+  }
+
+  static Future<bool> cancel(int id) async {
+    try {
+      return await _channel.invokeMethod<bool>('cancel', {'id': id}) ?? false;
+    } on PlatformException {
+      return false;
+    } on MissingPluginException {
+      return false;
+    }
+  }
+
+  static Future<bool> openFile(int id) async {
+    try {
+      return await _channel.invokeMethod<bool>('openFile', {'id': id}) ?? false;
+    } on PlatformException {
+      return false;
+    } on MissingPluginException {
+      return false;
+    }
+  }
+
+  static Future<bool> hasAllFilesAccess() async {
+    try {
+      return await _channel.invokeMethod<bool>('hasAllFilesAccess') ?? false;
+    } on PlatformException {
+      return false;
+    } on MissingPluginException {
+      return false;
+    }
+  }
+
+  static Future<bool> requestAllFilesAccess() async {
+    try {
+      return await _channel.invokeMethod<bool>('requestAllFilesAccess') ?? false;
+    } on PlatformException {
+      return false;
+    } on MissingPluginException {
+      return false;
+    }
+  }
+
+  static Future<void> scanFile(String path) async {
+    try {
+      await _channel.invokeMethod<bool>('scanFile', {'path': path});
+    } catch (_) {}
+  }
+
+  static Future<void> restartApp() async {
+    try {
+      await _channel.invokeMethod<bool>('restartApp');
+    } catch (_) {}
+  }
+
+  static Future<void> shareText(String text, {String title = 'Dropify'}) async {
+    try {
+      await _channel.invokeMethod<bool>('shareText', {
+        'text': text,
+        'title': title,
+      });
+    } catch (_) {}
+  }
+
+  static Future<bool> openPath(String path, {String? mime}) async {
+    try {
+      return await _channel.invokeMethod<bool>('openPath', {
+            'path': path,
+            'mime': mime,
+          }) ??
+          false;
+    } on PlatformException {
+      return false;
+    } on MissingPluginException {
+      return false;
+    }
+  }
+
+  static Future<void> notifyDownload({
+    required int id,
+    required String title,
+    required String text,
+    required double progress,
+    bool done = false,
+    String? error,
+  }) async {
+    try {
+      await _channel.invokeMethod<bool>('notifyDownload', {
+        'id': id,
+        'title': title,
+        'text': text,
+        'progress': progress,
+        'done': done,
+        'error': error,
+      });
+    } catch (_) {}
+  }
+
+  static Future<void> cancelNotification(int id) async {
+    try {
+      await _channel.invokeMethod<bool>('cancelNotification', {'id': id});
+    } catch (_) {}
+  }
+
+  static Future<bool> notificationsEnabled() async {
+    try {
+      return await _channel.invokeMethod<bool>('notificationsEnabled') ?? true;
+    } on PlatformException {
+      return true;
+    } on MissingPluginException {
+      return true;
+    }
+  }
+
+  static Future<bool> requestPermissions() async {
+    try {
+      return await _channel.invokeMethod<bool>('requestPermissions') ?? true;
+    } on PlatformException {
+      return false;
+    } on MissingPluginException {
+      return false;
+    }
+  }
+}
