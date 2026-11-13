@@ -139,22 +139,18 @@ class _HomeScreenState extends State<HomeScreen> {
       bottomNavigationBar: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 6, 18, 16),
-          child: Row(
-            children: [
-              Expanded(
-                child: _FloatingNav(
-                  index: _index,
-                  labels: [s.home, s.files, s.photos],
-                  onSelect: (i) {
-                    setState(() => _index = i);
-                    if (!_ctrl.loading) _ctrl.refresh();
-                  },
-                ),
-              ),
-              const SizedBox(width: 12),
-              _FabCircle(onTap: _showAddMenu),
-            ],
+          padding: const EdgeInsets.fromLTRB(14, 6, 14, 14),
+          child: _FloatingNav(
+            index: _index,
+            labels: [s.home, s.files, s.photos, s.addNew],
+            onSelect: (i) {
+              if (i == 3) {
+                _showAddMenu();
+                return;
+              }
+              setState(() => _index = i);
+              if (!_ctrl.loading) _ctrl.refresh();
+            },
           ),
         ),
       ),
@@ -174,21 +170,26 @@ class _FloatingNav extends StatelessWidget {
   final List<String> labels;
   final ValueChanged<int> onSelect;
 
-  static const _icons = [Icons.home_rounded, Icons.folder_rounded, Icons.photo_rounded];
+  static const _icons = [
+    Icons.home_rounded,
+    Icons.folder_rounded,
+    Icons.photo_rounded,
+    Icons.add_rounded,
+  ];
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 64,
-      padding: const EdgeInsets.all(6),
+      height: 78,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
         color: AppColors.cardHigh,
-        borderRadius: BorderRadius.circular(36),
+        borderRadius: BorderRadius.circular(34),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.35),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
+            color: Colors.black.withOpacity(0.4),
+            blurRadius: 28,
+            offset: const Offset(0, 12),
           ),
         ],
       ),
@@ -200,13 +201,15 @@ class _FloatingNav extends StatelessWidget {
                 behavior: HitTestBehavior.opaque,
                 onTap: () => onSelect(i),
                 child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 260),
+                  duration: const Duration(milliseconds: 240),
                   curve: Curves.easeOutCubic,
                   decoration: BoxDecoration(
-                    color: i == index ? AppColors.primary : Colors.transparent,
-                    borderRadius: BorderRadius.circular(30),
+                    color: i == index
+                        ? AppColors.primary
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(24),
                   ),
-                  child: Row(
+                  child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
@@ -216,56 +219,27 @@ class _FloatingNav extends StatelessWidget {
                             ? AppColors.onPrimary
                             : AppColors.muted,
                       ),
-                      if (i == index) ...[
-                        const SizedBox(width: 8),
-                        Flexible(
-                          child: Text(
-                            labels[i],
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: AppColors.onPrimary,
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
+                      const SizedBox(height: 3),
+                      Text(
+                        labels[i],
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: i == index
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                          color: i == index
+                              ? AppColors.onPrimary
+                              : AppColors.muted,
                         ),
-                      ],
+                      ),
                     ],
                   ),
                 ),
               ),
             ),
         ],
-      ),
-    );
-  }
-}
-
-class _FabCircle extends StatelessWidget {
-  const _FabCircle({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 64,
-        height: 64,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: AppColors.primary,
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primary.withOpacity(0.35),
-              blurRadius: 22,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Icon(Icons.add, size: 30, color: AppColors.onPrimary),
       ),
     );
   }

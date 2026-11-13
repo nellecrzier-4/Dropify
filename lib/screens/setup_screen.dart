@@ -4,6 +4,7 @@ import '../l10n/app_strings.dart';
 import '../l10n/locale_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/anim.dart';
+import '../widgets/glass.dart';
 import '../widgets/star_badge.dart';
 
 class _SetupPage {
@@ -74,7 +75,7 @@ class _SetupScreenState extends State<SetupScreen> {
     final isLast = _index == pages.length - 1;
 
     return Scaffold(
-      body: OrbBackground(
+      body: GlassBackground(
         child: SafeArea(
           child: Column(
             children: [
@@ -212,10 +213,12 @@ class _PageBody extends StatelessWidget {
       },
       child: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          child: GlassPanel(
+            padding: const EdgeInsets.fromLTRB(22, 30, 22, 26),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
               Entrance(
                 delay: const Duration(milliseconds: 60),
                 slide: 16,
@@ -253,7 +256,8 @@ class _PageBody extends StatelessWidget {
                   ),
                 ),
               ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

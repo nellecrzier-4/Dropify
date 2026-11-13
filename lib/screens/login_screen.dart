@@ -6,6 +6,7 @@ import '../l10n/locale_controller.dart';
 import '../services/pixeldrain_api.dart';
 import '../theme/app_theme.dart';
 import '../widgets/anim.dart';
+import '../widgets/glass.dart';
 import '../widgets/star_badge.dart';
 import '../widgets/wave_progress.dart';
 import 'home_screen.dart';
@@ -106,7 +107,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     final s = context.s;
     return Scaffold(
-      body: OrbBackground(
+      body: GlassBackground(
         child: SafeArea(
           child: Stack(
             children: [
@@ -139,7 +140,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       duration: const Duration(milliseconds: 420),
                       child: _checking
                           ? const _Checking(key: ValueKey('checking'))
-                          : _form(context),
+                          : GlassPanel(child: _form(context)),
                     ),
                   ),
                 ),
