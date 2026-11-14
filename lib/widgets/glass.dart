@@ -122,7 +122,7 @@ class _GlassOrbPainter extends CustomPainter {
   void _orb(Canvas canvas, Offset center, double radius, Color color) {
     final paint = Paint()
       ..shader = RadialGradient(
-        colors: [color.withOpacity(0.55), color.withOpacity(0)],
+        colors: [color.withOpacity(0.26), color.withOpacity(0)],
       ).createShader(Rect.fromCircle(center: center, radius: radius));
     canvas.drawCircle(center, radius, paint);
   }
