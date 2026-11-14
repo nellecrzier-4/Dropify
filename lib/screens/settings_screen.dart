@@ -5,12 +5,10 @@ import 'package:flutter/material.dart';
 import '../l10n/app_strings.dart';
 import '../l10n/locale_controller.dart';
 import '../services/app_settings.dart';
-import '../services/cache_cleaner.dart';
 import '../services/native_downloads.dart';
 import '../theme/app_theme.dart';
 import '../theme/theme_controller.dart';
 import '../utils/file_types.dart';
-import 'join_parts_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -211,32 +209,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       context,
                       MaterialPageRoute(builder: (_) => const HistoryScreen()),
                     ),
-                  ),
-                  ListTile(
-                    leading: Icon(Icons.merge_type, color: AppColors.primary),
-                    title: Text(s.joinParts),
-                    subtitle: Text(s.joinPartsHint,
-                        style: const TextStyle(
-                            color: AppColors.muted, fontSize: 12)),
-                    trailing: const Icon(Icons.chevron_right,
-                        color: AppColors.muted),
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const JoinPartsScreen()),
-                    ),
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.cleaning_services_outlined),
-                    title: Text(s.clearCache),
-                    onTap: () async {
-                      final freed = await CacheCleaner.clearTempCache();
-                      if (!context.mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('${s.cacheCleared} · ${formatSize(freed)}'),
-                        ),
-                      );
-                    },
                   ),
                   ListTile(
                     leading: const Icon(Icons.delete_sweep_outlined),

@@ -52,7 +52,6 @@ abstract class AppStrings {
   String get english;
   String get languageSubtitle;
   String get settings;
-  String get home;
   String get appearance;
   String get dynamicColor;
   String get dynamicColorHint;
@@ -107,20 +106,6 @@ abstract class AppStrings {
   String doneDetail(String size);
   String uploadDoneDetail(String size);
   String uploadingDetail(String sent, String total, String speed);
-  String partOf(int index, int total);
-  String get joinParts;
-  String get joinPartsHint;
-  String get deletePartsAfter;
-  String get deletePartsHint;
-  String get noPartsFound;
-  String get parts;
-  String get merge;
-  String get joined;
-  String get joinFailed;
-  String get joinOverwriteTitle;
-  String get joinOverwriteBody;
-  String get clearCache;
-  String get cacheCleared;
   String get canceled;
   String failedDetail(String error);
   String get openFileFailed;
@@ -334,9 +319,6 @@ class StringsId extends AppStrings {
   String get settings => 'Pengaturan';
 
   @override
-  String get home => 'Home';
-
-  @override
   String get appearance => 'Tampilan';
 
   @override
@@ -488,51 +470,6 @@ class StringsId extends AppStrings {
   @override
   String uploadingDetail(String sent, String total, String speed) =>
       '$sent / $total · $speed/s';
-
-  @override
-  String partOf(int index, int total) => 'Bagian $index/$total';
-
-  @override
-  String get joinParts => 'Gabung bagian';
-
-  @override
-  String get joinPartsHint =>
-      'Gabungkan file multi-bagian (nama.part1, nama.part2, …) jadi satu file.';
-
-  @override
-  String get deletePartsAfter => 'Hapus bagian setelah digabung';
-
-  @override
-  String get deletePartsHint =>
-      'Menghemat ruang; file hasil gabungan tetap disimpan.';
-
-  @override
-  String get noPartsFound =>
-      'Tidak ada file multi-bagian di Download/Dropify.';
-
-  @override
-  String get parts => 'bagian';
-
-  @override
-  String get merge => 'Gabung';
-
-  @override
-  String get joined => 'Selesai digabung:';
-
-  @override
-  String get joinFailed => 'Gagal menggabung';
-
-  @override
-  String get joinOverwriteTitle => 'File sudah ada';
-
-  @override
-  String get joinOverwriteBody => 'sudah ada. Timpa?';
-
-  @override
-  String get clearCache => 'Bersihkan cache';
-
-  @override
-  String get cacheCleared => 'Cache dibersihkan';
 
   @override
   String get canceled => 'Dibatalkan';
@@ -884,9 +821,6 @@ class StringsEn extends AppStrings {
   String get settings => 'Settings';
 
   @override
-  String get home => 'Home';
-
-  @override
   String get appearance => 'Appearance';
 
   @override
@@ -1038,51 +972,6 @@ class StringsEn extends AppStrings {
   @override
   String uploadingDetail(String sent, String total, String speed) =>
       '$sent / $total · $speed/s';
-
-  @override
-  String partOf(int index, int total) => 'Bagian $index/$total';
-
-  @override
-  String get joinParts => 'Gabung bagian';
-
-  @override
-  String get joinPartsHint =>
-      'Gabungkan file multi-bagian (nama.part1, nama.part2, …) jadi satu file.';
-
-  @override
-  String get deletePartsAfter => 'Hapus bagian setelah digabung';
-
-  @override
-  String get deletePartsHint =>
-      'Menghemat ruang; file hasil gabungan tetap disimpan.';
-
-  @override
-  String get noPartsFound =>
-      'Tidak ada file multi-bagian di Download/Dropify.';
-
-  @override
-  String get parts => 'bagian';
-
-  @override
-  String get merge => 'Gabung';
-
-  @override
-  String get joined => 'Selesai digabung:';
-
-  @override
-  String get joinFailed => 'Gagal menggabung';
-
-  @override
-  String get joinOverwriteTitle => 'File sudah ada';
-
-  @override
-  String get joinOverwriteBody => 'sudah ada. Timpa?';
-
-  @override
-  String get clearCache => 'Bersihkan cache';
-
-  @override
-  String get cacheCleared => 'Cache dibersihkan';
 
   @override
   String get canceled => 'Canceled';

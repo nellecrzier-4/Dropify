@@ -136,111 +136,40 @@ class _HomeScreenState extends State<HomeScreen> {
           PhotosTab(ctrl: _ctrl),
         ],
       ),
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 6, 14, 14),
-          child: _FloatingNav(
-            index: _index,
-            labels: [s.home, s.files, s.photos, s.addNew],
-            onSelect: (i) {
-              if (i == 3) {
-                _showAddMenu();
-                return;
-              }
-              HapticFeedback.selectionClick();
-              setState(() => _index = i);
-              if (!_ctrl.loading) _ctrl.refresh();
-            },
-          ),
+      floatingActionButton: SizedBox(
+        width: 64,
+        height: 64,
+        child: FloatingActionButton(
+          onPressed: _showAddMenu,
+          backgroundColor: AppColors.primary,
+          foregroundColor: AppColors.onPrimary,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+          child: const Icon(Icons.add, size: 32),
         ),
       ),
-    );
-  }
-}
-
-
-class _FloatingNav extends StatelessWidget {
-  const _FloatingNav({
-    required this.index,
-    required this.labels,
-    required this.onSelect,
-  });
-
-  final int index;
-  final List<String> labels;
-  final ValueChanged<int> onSelect;
-
-  static const _icons = [
-    Icons.home_rounded,
-    Icons.folder_rounded,
-    Icons.photo_rounded,
-    Icons.add_rounded,
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 78,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppColors.cardHigh,
-        borderRadius: BorderRadius.circular(34),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.4),
-            blurRadius: 28,
-            offset: const Offset(0, 12),
+      bottomNavigationBar: ColoredBox(
+        color: AppColors.bg,
+        child: SafeArea(
+          top: false,
+          child: NavigationBar(
+            selectedIndex: _index,
+            onDestinationSelected: (i) {
+              setState(() => _index = i);
+              // Segarkan saat pindah tab supaya upload baru langsung terlihat.
+              if (!_ctrl.loading) _ctrl.refresh();
+            },
+            destinations: [
+              const NavigationDestination(
+                  icon: Icon(Icons.home), label: 'Home'),
+              NavigationDestination(
+                  icon: const Icon(Icons.folder_open), label: s.files),
+              NavigationDestination(
+                  icon: const Icon(Icons.photo_library_outlined),
+                  label: s.photos),
+            ],
           ),
-        ],
-      ),
-      child: Row(
-        children: [
-          for (var i = 0; i < labels.length; i++)
-            Expanded(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => onSelect(i),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 240),
-                  curve: Curves.easeOutCubic,
-                  decoration: BoxDecoration(
-                    color: i == index
-                        ? AppColors.primary
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        _icons[i],
-                        size: 22,
-                        color: i == index
-                            ? AppColors.onPrimary
-                            : AppColors.muted,
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        labels[i],
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 10.5,
-                          fontWeight: i == index
-                              ? FontWeight.w700
-                              : FontWeight.w500,
-                          color: i == index
-                              ? AppColors.onPrimary
-                              : AppColors.muted,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-        ],
+        ),
       ),
     );
   }

@@ -4,7 +4,6 @@ import '../controllers/drive_controller.dart';
 import '../l10n/locale_controller.dart';
 import '../theme/app_theme.dart';
 import '../utils/file_types.dart';
-import 'wave_progress.dart';
 
 /// Status sinkronisasi dengan Pixeldrain (data asli dari DriveController).
 class SyncCard extends StatelessWidget {
@@ -44,60 +43,48 @@ class SyncCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         onTap: syncing ? null : (ctrl.sessionExpired ? onLogout : ctrl.refresh),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 16, 14, 16),
+          padding: const EdgeInsets.fromLTRB(20, 18, 16, 18),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  Container(
-                    width: 46,
-                    height: 46,
-                    decoration: BoxDecoration(
-                      color: AppColors.cardHigh,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(icon,
-                        color: failed ? AppColors.danger : AppColors.primary,
-                        size: 22),
-                  ),
+                  Icon(icon,
+                      color: failed ? Colors.redAccent : AppColors.muted),
                   const SizedBox(width: 14),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                                fontSize: 15.5, fontWeight: FontWeight.w700)),
-                        if (subtitle != null) ...[
-                          const SizedBox(height: 3),
-                          Text(subtitle,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                  color: AppColors.muted, fontSize: 12.5)),
-                        ],
-                      ],
-                    ),
+                    child: Text(title,
+                        style: const TextStyle(
+                            fontSize: 17, fontWeight: FontWeight.w500)),
                   ),
                   if (failed)
-                    TextButton(
-                      onPressed: ctrl.sessionExpired ? onLogout : ctrl.refresh,
-                      style: TextButton.styleFrom(
-                        foregroundColor: AppColors.primary,
-                        shape: const StadiumBorder(),
-                      ),
-                      child: Text(ctrl.sessionExpired ? s.signIn : s.retry),
-                    )
+                    Text(ctrl.sessionExpired ? s.signIn : s.retry,
+                        style: TextStyle(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w700))
                   else
                     const Icon(Icons.chevron_right, color: AppColors.muted),
                 ],
               ),
               if (syncing) ...[
                 const SizedBox(height: 14),
-                const WaveProgressBar(value: 0, indeterminate: true, height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    minHeight: 4,
+                    backgroundColor: AppColors.divider,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ],
+              if (subtitle != null) ...[
+                const SizedBox(height: 6),
+                Padding(
+                  padding: const EdgeInsets.only(left: 38),
+                  child: Text(subtitle,
+                      style: const TextStyle(
+                          color: AppColors.muted, fontSize: 13.5)),
+                ),
               ],
             ],
           ),
