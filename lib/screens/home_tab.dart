@@ -14,14 +14,29 @@ import '../widgets/transfers_sheet.dart';
 import '../widgets/wave_progress.dart';
 import 'file_list_screen.dart';
 
-class HomeTab extends StatelessWidget {
+class HomeTab extends StatefulWidget {
   final DriveController ctrl;
   final VoidCallback onLogout;
   const HomeTab({super.key, required this.ctrl, required this.onLogout});
 
   @override
+  State<HomeTab> createState() => _HomeTabState();
+}
+
+class _HomeTabState extends State<HomeTab> {
+  final ScrollController _scroll = ScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final s = context.s;
+    final ctrl = widget.ctrl;
+    final onLogout = widget.onLogout;
 
     return SafeArea(
       child: ListenableBuilder(
@@ -46,7 +61,21 @@ class HomeTab extends StatelessWidget {
                 left: 0,
                 right: 0,
                 height: 360,
-                child: _Hero(
+                child: AnimatedBuilder(
+                  animation: _scroll,
+                  builder: (context, child) {
+                    final offset = _scroll.hasClients
+                        ? _scroll.offset.clamp(0.0, 300.0)
+                        : 0.0;
+                    return Transform.translate(
+                      offset: Offset(0, offset * 0.45),
+                      child: Opacity(
+                        opacity: (1 - offset / 480).clamp(0.35, 1.0),
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: _Hero(
                   initial: initial,
                   username: ctrl.username,
                   total: formatSize(total),
@@ -56,13 +85,16 @@ class HomeTab extends StatelessWidget {
                     MaterialPageRoute(
                         builder: (_) => const SettingsScreen()),
                   ),
-                  onLogout: onLogout,
+                    onLogout: onLogout,
+                  ),
                 ),
               ),
               Positioned.fill(
                 child: ListView(
-                  padding: const EdgeInsets.only(top: 322, bottom: 130),
+                  controller: _scroll,
+                  padding: const EdgeInsets.only(top: 300, bottom: 130),
                   children: [
+                    const _BlurEdge(),
                     ClipRRect(
                       borderRadius: const BorderRadius.vertical(
                           top: Radius.circular(34)),
@@ -517,6 +549,40 @@ class _Hero extends StatelessWidget {
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+
+/// Tepi blur bertingkat: hero melebur ke panel konten.
+class _BlurEdge extends StatelessWidget {
+  const _BlurEdge();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 26,
+      child: Stack(
+        children: [
+          for (final entry in const [
+                [12.0, 26.0],
+                [24.0, 18.0],
+                [42.0, 10.0],
+              ])
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: entry[1],
+              child: ClipRect(
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: entry[0], sigmaY: entry[0]),
+                  child: const SizedBox.expand(),
+                ),
+              ),
+            ),
         ],
       ),
     );

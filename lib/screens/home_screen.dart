@@ -148,6 +148,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 _showAddMenu();
                 return;
               }
+              HapticFeedback.selectionClick();
               setState(() => _index = i);
               if (!_ctrl.loading) _ctrl.refresh();
             },
