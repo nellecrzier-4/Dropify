@@ -5,14 +5,29 @@ allprojects {
     }
 }
 
-rootProject.buildDir = "../build"
-subprojects {
-    project.buildDir = "${rootProject.buildDir}/${project.name}"
+def newBuildDir = rootProject.layout.buildDirectory.dir("../../build").get()
+rootProject.layout.buildDirectory.value(newBuildDir)
+
+// Plugin lama (mis. file_picker 8.x) masih compile terhadap SDK 34, sementara
+// flutter_plugin_android_lifecycle butuh 35+. Paksa semua modul ke SDK 36.
+// Didaftarkan SEBELUM evaluationDependsOn supaya belum dievaluasi.
+subprojects { subproject ->
+    subproject.afterEvaluate {
+        def androidExt = subproject.extensions.findByName("android")
+        if (androidExt != null) {
+            androidExt.compileSdk = 36
+        }
+    }
 }
+
+subprojects {
+    project.layout.buildDirectory.value(newBuildDir.dir(project.name))
+}
+
 subprojects {
     project.evaluationDependsOn(":app")
 }
 
 tasks.register("clean", Delete) {
-    delete rootProject.buildDir
+    delete rootProject.layout.buildDirectory
 }

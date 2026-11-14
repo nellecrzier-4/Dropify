@@ -8,3 +8,9 @@ test/failures/
 build/
 .flutter-plugins-dependencies
 android/local.properties
+
+# Gradle & build cache lokal
+.gradle/
+android/.gradle/
+android/app/.cxx/
+*.apk
