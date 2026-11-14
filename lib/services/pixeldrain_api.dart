@@ -387,6 +387,33 @@ class PixeldrainApi {
         return _asMap(response.data)['id']?.toString();
       });
 
+  /// Upload hanya sebagian file (untuk file > 8 GB yang dipecah).
+  /// Dialirkan langsung dari file asli, tanpa menyalin ke cache.
+  Future<void> uploadRange(
+    File file,
+    int start,
+    int end,
+    String name,
+    void Function(int sent, int total) onProgress,
+  ) =>
+      _guard(() async {
+        final length = end - start;
+        final response = await _dio.put(
+          '/file/${Uri.encodeComponent(name)}',
+          data: file.openRead(start, end),
+          options: Options(
+            headers: {
+              Headers.contentLengthHeader: length,
+              Headers.contentTypeHeader: _mimeForName(name),
+            },
+            sendTimeout: null,
+            receiveTimeout: const Duration(minutes: 5),
+          ),
+          onSendProgress: onProgress,
+        );
+        _check(response);
+      });
+
   Future<void> logout() async {
     try {
       await _dio.delete('/user/session');

@@ -1,3 +1,6 @@
+import 'dart:io';
+import 'dart:math' as math;
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 
@@ -11,6 +14,8 @@ enum UploadStatus { uploading, done, error }
 class UploadTask {
   final String name;
   final int size;
+  int parts = 1;
+  int currentPart = 1;
   double progress = 0;
   double speed = 0;
   int sent = 0;
@@ -73,6 +78,50 @@ class DriveController extends ChangeNotifier {
     }
   }
 
+  /// Batas per file di Pixeldrain 8 GB. File lebih besar dipecah otomatis
+  /// menjadi beberapa bagian (tetap file terpisah, bukan menembus limit server).
+  static const int maxPartSize = 7 * 1024 * 1024 * 1024;
+
+  Future<void> _uploadOne(
+    UploadTask task,
+    String path,
+    String name,
+    void Function(int sent, int total) onProgress,
+  ) async {
+    final file = File(path);
+    final size = await file.length();
+
+    if (size <= maxPartSize) {
+      task
+        ..parts = 1
+        ..currentPart = 1;
+      await api.uploadFile(path, name, onProgress);
+      return;
+    }
+
+    final parts = (size / maxPartSize).ceil();
+    task.parts = parts;
+    final dot = name.lastIndexOf('.');
+    final stem = dot > 0 ? name.substring(0, dot) : name;
+    final ext = dot > 0 ? name.substring(dot) : '';
+
+    var uploaded = 0;
+    for (var i = 0; i < parts; i++) {
+      final start = i * maxPartSize;
+      final end = math.min(start + maxPartSize, size);
+      task.currentPart = i + 1;
+      notifyListeners();
+
+      final partName = '$stem.part${i + 1}$ext';
+      final base = uploaded;
+      // Dialirkan langsung dari file asli — tidak ada salinan di cache.
+      await api.uploadRange(file, start, end, partName, (sent, total) {
+        onProgress(base + sent, size);
+      });
+      uploaded += end - start;
+    }
+  }
+
   Future<void> pickAndUpload() async {
     final res = await FilePicker.platform.pickFiles(allowMultiple: true);
     if (res == null) return;
@@ -84,7 +133,7 @@ class DriveController extends ChangeNotifier {
       uploads.insert(0, task);
       notifyListeners();
       try {
-        await api.uploadFile(path, f.name, (sent, total) {
+        await _uploadOne(task, path, f.name, (sent, total) {
           if (total <= 0) return;
           task.sent = sent;
           final p = sent / total;

@@ -439,11 +439,14 @@ class _UploadsTab extends StatelessWidget {
                       WaveProgressBar(value: t.progress, height: 10),
                       const SizedBox(height: 8),
                       Text(
-                        s.uploadingDetail(
-                          formatSize(t.sent),
-                          formatSize(t.size),
-                          t.speed > 0 ? formatSize(t.speed.round()) : '—',
-                        ),
+                        [
+                          if (t.parts > 1) s.partOf(t.currentPart, t.parts),
+                          s.uploadingDetail(
+                            formatSize(t.sent),
+                            formatSize(t.size),
+                            t.speed > 0 ? formatSize(t.speed.round()) : '—',
+                          ),
+                        ].join(' · '),
                         style: const TextStyle(
                           color: AppColors.muted,
                           fontSize: 12.5,
