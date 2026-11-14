@@ -1,8 +1,6 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 
-import '../theme/app_theme.dart';
+import 'kit.dart';
 
 /// Muncul dengan fade + naik + membesar, bisa diberi jeda untuk efek stagger.
 class Entrance extends StatefulWidget {
@@ -141,92 +139,15 @@ class _PressScaleState extends State<PressScale> {
   }
 }
 
-/// Latar dengan dua "orb" gradien yang bergerak pelan.
-class OrbBackground extends StatefulWidget {
-  const OrbBackground({super.key, required this.child});
+/// Latar aurora (kanvas + wash warna lembut) untuk layar setup/login.
+class OrbBackground extends StatelessWidget {
+  const OrbBackground({super.key, required this.child, this.dots = false});
 
   final Widget child;
+  final bool dots;
 
   @override
-  State<OrbBackground> createState() => _OrbBackgroundState();
+  Widget build(BuildContext context) =>
+      AuroraBackground(dots: dots, child: child);
 }
 
-class _OrbBackgroundState extends State<OrbBackground>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(seconds: 18),
-  )..repeat();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: RepaintBoundary(
-            child: AnimatedBuilder(
-              animation: _controller,
-              builder: (context, _) => CustomPaint(
-                painter: _OrbPainter(t: _controller.value),
-              ),
-            ),
-          ),
-        ),
-        widget.child,
-      ],
-    );
-  }
-}
-
-class _OrbPainter extends CustomPainter {
-  _OrbPainter({required this.t});
-
-  final double t;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final angle = t * 2 * math.pi;
-
-    _orb(
-      canvas,
-      center: Offset(
-        size.width * (0.28 + 0.10 * math.sin(angle)),
-        size.height * 0.10 + size.height * 0.05 * math.cos(angle),
-      ),
-      radius: size.width * 0.62,
-      color: AppColors.accent.withOpacity(0.33),
-    );
-
-    _orb(
-      canvas,
-      center: Offset(
-        size.width * (0.80 + 0.08 * math.cos(angle * 0.8)),
-        size.height * 0.30 + size.height * 0.06 * math.sin(angle * 0.7),
-      ),
-      radius: size.width * 0.45,
-      color: const Color(0xFF5B4BE8).withOpacity(0.18),
-    );
-  }
-
-  void _orb(
-    Canvas canvas, {
-    required Offset center,
-    required double radius,
-    required Color color,
-  }) {
-    final paint = Paint()
-      ..shader = RadialGradient(
-        colors: [color, color.withOpacity(0)],
-      ).createShader(Rect.fromCircle(center: center, radius: radius));
-    canvas.drawCircle(center, radius, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant _OrbPainter old) => old.t != t;
-}

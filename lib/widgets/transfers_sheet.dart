@@ -4,11 +4,13 @@ import 'package:flutter/services.dart';
 import '../controllers/drive_controller.dart';
 import '../l10n/app_strings.dart';
 import '../l10n/locale_controller.dart';
-import '../services/download_service.dart';
 import '../screens/settings_screen.dart';
+import '../services/download_service.dart';
 import '../services/native_downloads.dart';
 import '../theme/app_theme.dart';
 import '../utils/file_types.dart';
+import 'kit.dart';
+import 'motion.dart';
 import 'wave_progress.dart';
 
 /// Sheet "Transfers": tab Downloads (link bypass) dan Uploads.
@@ -19,7 +21,6 @@ void showTransfers(
 }) {
   showModalBottomSheet(
     context: context,
-    backgroundColor: AppColors.card,
     isScrollControlled: true,
     builder: (_) => DefaultTabController(
       length: 2,
@@ -64,11 +65,13 @@ class _TransfersSheetState extends State<_TransfersSheet> {
   @override
   Widget build(BuildContext context) {
     final s = context.s;
+    final scheme = AppColors.scheme;
     final height = MediaQuery.of(context).size.height * 0.76;
 
-    return SafeArea(
-      child: SizedBox(
-        height: height,
+    return SizedBox(
+      height: height,
+      child: SafeArea(
+        top: false,
         child: ListenableBuilder(
           listenable: Listenable.merge([widget.ctrl, widget.ctrl.downloads]),
           builder: (context, _) {
@@ -77,53 +80,79 @@ class _TransfersSheetState extends State<_TransfersSheet> {
             return Column(
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 18, 12, 0),
+                  padding: const EdgeInsets.fromLTRB(22, 4, 10, 0),
                   child: Row(
                     children: [
-                      Text(
-                        s.transfers,
-                        style: const TextStyle(
-                          fontSize: 19,
-                          fontWeight: FontWeight.w800,
+                      Expanded(
+                        child: Text(
+                          s.transfers,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 21,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.3,
+                            color: AppColors.text,
+                          ),
                         ),
                       ),
-                      const Spacer(),
-                      IconButton(
+                      IconButton.filledTonal(
                         tooltip: s.downloadHistory,
-                        icon: const Icon(Icons.history, color: AppColors.muted),
                         onPressed: () => Navigator.push(
                           context,
-                          MaterialPageRoute(
-                            builder: (_) => const HistoryScreen(),
-                          ),
+                          SharedAxisPageRoute(
+                              builder: (_) => const HistoryScreen()),
                         ),
+                        icon: const Icon(Icons.history_rounded, size: 20),
                       ),
-                      if (ctrl.downloads.tasks.any((t) => !t.isActive))
-                        TextButton(
-                          onPressed: ctrl.downloads.clearFinished,
-                          style: TextButton.styleFrom(
-                            foregroundColor: AppColors.muted,
-                            shape: const StadiumBorder(),
-                          ),
-                          child: Text(s.clear),
-                        ),
+                      AnimatedSize(
+                        duration: Motion.fast,
+                        child: ctrl.downloads.tasks.any((t) => !t.isActive)
+                            ? TextButton(
+                                onPressed: ctrl.downloads.clearFinished,
+                                style: TextButton.styleFrom(
+                                  foregroundColor: scheme.onSurfaceVariant,
+                                  shape: const StadiumBorder(),
+                                ),
+                                child: Text(s.clear),
+                              )
+                            : const SizedBox(width: 0, height: 0),
+                      ),
                     ],
                   ),
                 ),
                 if (!_notificationsOn)
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 6),
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 2),
                     child: _PermissionCard(onAllow: _askPermission),
                   ),
-                TabBar(
-                  dividerColor: Colors.transparent,
-                  indicatorColor: AppColors.primary,
-                  labelColor: AppColors.text,
-                  unselectedLabelColor: AppColors.muted,
-                  tabs: [
-                    Tab(text: active > 0 ? '${s.downloads} · $active' : s.downloads),
-                    Tab(text: s.uploads),
-                  ],
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+                  child: TabBar(
+                    dividerColor: Colors.transparent,
+                    indicatorSize: TabBarIndicatorSize.tab,
+                    indicator: BoxDecoration(
+                      color: scheme.secondaryContainer,
+                      borderRadius: BorderRadius.circular(AppRadii.pill),
+                    ),
+                    labelColor: scheme.onSecondaryContainer,
+                    unselectedLabelColor: scheme.onSurfaceVariant,
+                    labelStyle: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                    unselectedLabelStyle: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                    tabs: [
+                      Tab(
+                          text: active > 0
+                              ? '${s.downloads} · $active'
+                              : s.downloads),
+                      Tab(text: s.uploads),
+                    ],
+                  ),
                 ),
                 Expanded(
                   child: TabBarView(
@@ -150,26 +179,27 @@ class _PermissionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = context.s;
+    final scheme = AppColors.scheme;
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+      padding: const EdgeInsets.fromLTRB(12, 10, 6, 10),
       decoration: BoxDecoration(
-        color: AppColors.accent.withOpacity(0.16),
-        borderRadius: BorderRadius.circular(20),
+        color: scheme.secondaryContainer,
+        borderRadius: BorderRadius.circular(AppRadii.lg),
       ),
       child: Row(
         children: [
-          Icon(
-            Icons.notifications_active_outlined,
-            color: AppColors.primary,
-            size: 20,
+          GlowIcon(
+            icon: Icons.notifications_active_outlined,
+            size: 38,
+            color: scheme.onSecondaryContainer,
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 11),
           Expanded(
             child: Text(
               s.notificationsCard,
-              style: const TextStyle(
-                color: AppColors.text,
-                fontSize: 12.5,
+              style: TextStyle(
+                color: scheme.onSecondaryContainer,
+                fontSize: 12,
                 height: 1.35,
               ),
             ),
@@ -177,12 +207,113 @@ class _PermissionCard extends StatelessWidget {
           TextButton(
             onPressed: () => onAllow(),
             style: TextButton.styleFrom(
-              foregroundColor: AppColors.primary,
+              foregroundColor: scheme.onSecondaryContainer,
               shape: const StadiumBorder(),
             ),
             child: Text(s.allow),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Baris transfer: ikon tonal, judul, progres, dan aksi di kanan.
+class _TransferRow extends StatelessWidget {
+  const _TransferRow({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.subtitle,
+    this.progress,
+    this.trailing,
+    this.onTap,
+    this.index = 0,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final Widget subtitle;
+  final double? progress;
+  final Widget? trailing;
+  final VoidCallback? onTap;
+  final int index;
+
+  @override
+  Widget build(BuildContext context) {
+    final content = Padding(
+      padding: const EdgeInsets.fromLTRB(12, 11, 4, 11),
+      child: Row(
+        children: [
+          AnimatedSwitcher(
+            duration: Motion.fast,
+            transitionBuilder: (child, animation) => ScaleTransition(
+              scale: animation,
+              child: FadeTransition(opacity: animation, child: child),
+            ),
+            child: GlowIcon(
+              key: ValueKey(icon),
+              icon: icon,
+              size: 42,
+              color: iconColor,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: AppColors.text,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.1,
+                  ),
+                ),
+                if (progress != null) ...[
+                  const SizedBox(height: 9),
+                  TweenAnimationBuilder<double>(
+                    tween:
+                        Tween(begin: 0, end: progress!.clamp(0.0, 1.0)),
+                    duration: Motion.slow,
+                    curve: Motion.emphasized,
+                    builder: (context, value, _) => WaveProgressBar(
+                      value: value,
+                      height: 9,
+                      animate: false,
+                    ),
+                  ),
+                  const SizedBox(height: 7),
+                ] else
+                  const SizedBox(height: 3),
+                subtitle,
+              ],
+            ),
+          ),
+          if (trailing != null) ...[
+            const SizedBox(width: 4),
+            trailing!,
+          ],
+        ],
+      ),
+    );
+
+    return Stagger(
+      index: index,
+      step: const Duration(milliseconds: 40),
+      slide: 12,
+      child: Surface(
+        radius: AppRadii.xl,
+        padding: EdgeInsets.zero,
+        clip: true,
+        onTap: onTap,
+        child: content,
       ),
     );
   }
@@ -197,56 +328,90 @@ class _DownloadsTab extends StatelessWidget {
     final controller = ctrl;
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: AppColors.card,
       builder: (sheetContext) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              title: Text(task.name,
-                  maxLines: 1, overflow: TextOverflow.ellipsis),
-              subtitle: Text(
-                task.error == 'storage_permission'
-                    ? s.storagePermission
-                    : (task.error ?? s.downloadDetails),
-                style: const TextStyle(color: AppColors.muted, fontSize: 12.5),
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  GlowIcon(
+                    icon: Icons.error_outline_rounded,
+                    size: 44,
+                    color: AppColors.danger,
+                  ),
+                  const SizedBox(width: 13),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          task.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: AppColors.text,
+                            fontSize: 15.5,
+                            height: 1.25,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          task.error == 'storage_permission'
+                              ? s.storagePermission
+                              : (task.error ?? s.downloadDetails),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: AppColors.danger,
+                            fontSize: 12,
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-            ),
-            if (task.url != null)
-              ListTile(
-                leading: const Icon(Icons.link),
-                title: Text(s.copyLink),
-                subtitle: Text(task.url!,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        color: AppColors.muted, fontSize: 11)),
+              const SizedBox(height: 10),
+              if (task.url != null)
+                _DetailAction(
+                  icon: Icons.link_rounded,
+                  title: s.copyLink,
+                  subtitle: task.url,
+                  onTap: () {
+                    Clipboard.setData(ClipboardData(text: task.url!));
+                    Navigator.pop(sheetContext);
+                  },
+                ),
+              _DetailAction(
+                icon: Icons.refresh_rounded,
+                title: s.retry,
+                subtitle: s.attemptInfo(
+                  task.attempts,
+                  task.viaBypass ? s.viaBypass : s.viaPixeldrain,
+                ),
                 onTap: () {
-                  Clipboard.setData(ClipboardData(text: task.url!));
                   Navigator.pop(sheetContext);
+                  controller.downloads.retry(task.id);
                 },
               ),
-            ListTile(
-              leading: const Icon(Icons.refresh),
-              title: Text(s.retry),
-              subtitle: Text(
-                s.attemptInfo(task.attempts, task.viaBypass ? s.viaBypass : s.viaPixeldrain),
-                style: const TextStyle(color: AppColors.muted, fontSize: 12),
+              _DetailAction(
+                icon: Icons.public_rounded,
+                title: s.tryPixeldrain,
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  controller.downloads.retryWithoutBypass(task.id);
+                },
               ),
-              onTap: () {
-                Navigator.pop(sheetContext);
-                controller.downloads.retry(task.id);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.public),
-              title: Text(s.tryPixeldrain),
-              onTap: () {
-                Navigator.pop(sheetContext);
-                controller.downloads.retryWithoutBypass(task.id);
-              },
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -292,15 +457,15 @@ class _DownloadsTab extends StatelessWidget {
     switch (t.status) {
       case DownloadStatus.preparing:
       case DownloadStatus.queued:
-        return Icons.schedule;
+        return Icons.schedule_rounded;
       case DownloadStatus.downloading:
-        return Icons.downloading;
+        return Icons.downloading_rounded;
       case DownloadStatus.done:
-        return Icons.check_circle_outline;
+        return Icons.check_rounded;
       case DownloadStatus.canceled:
-        return Icons.cancel_outlined;
+        return Icons.close_rounded;
       case DownloadStatus.error:
-        return Icons.error_outline;
+        return Icons.error_outline_rounded;
     }
   }
 
@@ -309,85 +474,54 @@ class _DownloadsTab extends StatelessWidget {
     final s = context.s;
     final tasks = ctrl.downloads.tasks;
     if (tasks.isEmpty) {
-      return ListView(
-        padding: const EdgeInsets.fromLTRB(20, 22, 20, 28),
-        children: [
-          Text(s.noDownloads, style: const TextStyle(color: AppColors.muted)),
-          const SizedBox(height: 10),
-          Text(
-            s.noDownloadsHint,
-            style: const TextStyle(
-              color: AppColors.muted,
-              fontSize: 12.5,
-              height: 1.5,
-            ),
-          ),
-        ],
+      return const _EmptyTransfers(
+        icon: Icons.download_outlined,
+        emptyKey: _EmptyKind.downloads,
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.only(top: 4, bottom: 24),
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       itemCount: tasks.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (context, i) {
         final t = tasks[i];
         final failed = t.status == DownloadStatus.error;
-        return ListTile(
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-          leading: Icon(
-            _icon(t),
-            color: failed
-                ? AppColors.danger
-                : t.status == DownloadStatus.done
-                    ? AppColors.primary
-                    : AppColors.muted,
-          ),
-          title: Text(
-            t.name,
-            maxLines: 1,
+        return _TransferRow(
+          index: i,
+          icon: _icon(t),
+          iconColor: failed
+              ? AppColors.danger
+              : t.status == DownloadStatus.done
+                  ? AppColors.scheme.primary
+                  : AppColors.scheme.onSurfaceVariant,
+          title: t.name,
+          progress: t.status == DownloadStatus.downloading ? t.progress : null,
+          subtitle: Text(
+            _subtitle(s, t),
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14.5),
-          ),
-          subtitle: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (t.status == DownloadStatus.downloading) ...[
-                const SizedBox(height: 10),
-                WaveProgressBar(
-                  value: t.progress,
-                  height: 10,
-                  animate: true,
-                ),
-                const SizedBox(height: 8),
-              ] else
-                const SizedBox(height: 4),
-              Text(
-                _subtitle(s, t),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: failed ? AppColors.danger : AppColors.muted,
-                  fontSize: 12.5,
-                ),
-              ),
-            ],
+            style: TextStyle(
+              color: failed ? AppColors.danger : AppColors.scheme.onSurfaceVariant,
+              fontSize: 12,
+              height: 1.35,
+            ),
           ),
           trailing: t.isActive
               ? IconButton(
-                  icon: const Icon(Icons.close, color: AppColors.muted),
+                  icon: Icon(Icons.close_rounded,
+                      color: AppColors.scheme.onSurfaceVariant, size: 20),
                   onPressed: () => ctrl.downloads.cancel(t.id),
                 )
               : t.status == DownloadStatus.done
                   ? IconButton(
-                      icon: Icon(
-                        Icons.folder_open,
-                        color: AppColors.primary,
-                      ),
+                      icon: Icon(Icons.folder_open_rounded,
+                          color: AppColors.scheme.primary, size: 20),
                       onPressed: () => _open(context, t),
                     )
                   : IconButton(
-                      icon: const Icon(Icons.refresh, color: AppColors.muted),
+                      icon: Icon(Icons.refresh_rounded,
+                          color: AppColors.scheme.onSurfaceVariant, size: 20),
                       onPressed: () => ctrl.downloads.retry(t.id),
                     ),
           onTap: t.status == DownloadStatus.done
@@ -401,6 +535,127 @@ class _DownloadsTab extends StatelessWidget {
   }
 }
 
+enum _EmptyKind { downloads, uploads }
+
+class _EmptyTransfers extends StatelessWidget {
+  const _EmptyTransfers({required this.icon, required this.emptyKey});
+
+  final IconData icon;
+  final _EmptyKind emptyKey;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.s;
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+      children: [
+        Stagger(
+          child: DashedPanel(
+            radius: AppRadii.xl,
+            padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
+            child: Column(
+              children: [
+                OrbIcon(icon: icon, size: 96),
+                const SizedBox(height: 16),
+                Text(
+                  emptyKey == _EmptyKind.downloads ? s.noDownloads : s.noUploads,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: AppColors.scheme.onSurfaceVariant,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if (emptyKey == _EmptyKind.downloads) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    s.noDownloadsHint,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: AppColors.scheme.onSurfaceVariant,
+                      fontSize: 12,
+                      height: 1.5,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DetailAction extends StatelessWidget {
+  const _DetailAction({
+    required this.icon,
+    required this.title,
+    required this.onTap,
+    this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = AppColors.scheme;
+    return Pressable(
+      onTap: onTap,
+      scale: 0.98,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 7),
+        child: Row(
+          children: [
+            GlowIcon(
+              icon: icon,
+              size: 40,
+              color: scheme.primary,
+            ),
+            const SizedBox(width: 13),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: AppColors.text,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: -0.1,
+                    ),
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: scheme.onSurfaceVariant,
+                        fontSize: 11.5,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded,
+                color: scheme.onSurfaceVariant, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _UploadsTab extends StatelessWidget {
   final DriveController ctrl;
   const _UploadsTab({required this.ctrl});
@@ -409,72 +664,68 @@ class _UploadsTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = context.s;
     if (ctrl.uploads.isEmpty) {
-      return ListView(
-        padding: const EdgeInsets.fromLTRB(20, 22, 20, 28),
-        children: [
-          Text(s.noUploads, style: const TextStyle(color: AppColors.muted)),
-        ],
+      return const _EmptyTransfers(
+        icon: Icons.upload_outlined,
+        emptyKey: _EmptyKind.uploads,
       );
     }
 
-    return ListView(
-      padding: const EdgeInsets.only(top: 4, bottom: 24),
-      children: [
-        for (final t in ctrl.uploads)
-          ListTile(
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-            title: Text(
-              t.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style:
-                  const TextStyle(fontWeight: FontWeight.w600, fontSize: 14.5),
-            ),
-            subtitle: t.status == UploadStatus.uploading
-                ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 10),
-                      WaveProgressBar(value: t.progress, height: 10),
-                      const SizedBox(height: 8),
-                      Text(
-                        [
-                          if (t.parts > 1) s.partOf(t.currentPart, t.parts),
-                          s.uploadingDetail(
-                            formatSize(t.sent),
-                            formatSize(t.size),
-                            t.speed > 0 ? formatSize(t.speed.round()) : '—',
-                          ),
-                        ].join(' · '),
-                        style: const TextStyle(
-                          color: AppColors.muted,
-                          fontSize: 12.5,
-                        ),
-                      ),
-                    ],
-                  )
-                : Text(
-                    t.status == UploadStatus.done
-                        ? s.uploadDoneDetail(formatSize(t.size))
-                        : s.failedDetail(t.error ?? ''),
-                    style: TextStyle(
-                      color: t.status == UploadStatus.done
-                          ? AppColors.muted
-                          : AppColors.danger,
-                      fontSize: 12.5,
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      itemCount: ctrl.uploads.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (context, i) {
+        final t = ctrl.uploads[i];
+        final uploading = t.status == UploadStatus.uploading;
+        return _TransferRow(
+          index: i,
+          icon: switch (t.status) {
+            UploadStatus.uploading => Icons.arrow_upward_rounded,
+            UploadStatus.done => Icons.check_rounded,
+            UploadStatus.error => Icons.error_outline_rounded,
+          },
+          iconColor: t.status == UploadStatus.error
+              ? AppColors.danger
+              : AppColors.scheme.primary,
+          title: t.name,
+          progress: uploading ? t.progress : null,
+          subtitle: Text(
+            uploading
+                ? [
+                    if (t.parts > 1) s.partOf(t.currentPart, t.parts),
+                    s.uploadingDetail(
+                      formatSize(t.sent),
+                      formatSize(t.size),
+                      t.speed > 0 ? formatSize(t.speed.round()) : '—',
                     ),
-                  ),
-            trailing: Icon(
-              switch (t.status) {
-                UploadStatus.uploading => Icons.arrow_upward,
-                UploadStatus.done => Icons.check_circle_outline,
-                UploadStatus.error => Icons.error_outline,
-              },
-              color: AppColors.muted,
+                  ].join(' · ')
+                : (t.status == UploadStatus.done
+                    ? s.uploadDoneDetail(formatSize(t.size))
+                    : s.failedDetail(t.error ?? '')),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: t.status == UploadStatus.error
+                  ? AppColors.danger
+                  : AppColors.scheme.onSurfaceVariant,
+              fontSize: 12,
+              height: 1.35,
             ),
           ),
-      ],
+          trailing: Padding(
+            padding: const EdgeInsets.only(right: 10),
+            child: Icon(
+              switch (t.status) {
+                UploadStatus.uploading => Icons.arrow_upward_rounded,
+                UploadStatus.done => Icons.check_circle_outline_rounded,
+                UploadStatus.error => Icons.error_outline_rounded,
+              },
+              size: 20,
+              color: AppColors.scheme.onSurfaceVariant,
+            ),
+          ),
+        );
+      },
     );
   }
 }

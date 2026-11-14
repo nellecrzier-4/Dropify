@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../theme/app_theme.dart';
-import '../widgets/star_badge.dart';
+import '../widgets/anim.dart';
+import '../widgets/kit.dart';
 import '../widgets/wave_progress.dart';
 import 'login_screen.dart';
 import 'setup_screen.dart';
@@ -41,7 +42,7 @@ class _StartScreenState extends State<StartScreen> {
   Widget build(BuildContext context) {
     final done = _setupDone;
     return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 380),
+      duration: const Duration(milliseconds: 420),
       switchInCurve: Curves.easeOutCubic,
       switchOutCurve: Curves.easeInCubic,
       child: done == null
@@ -58,25 +59,37 @@ class _BootSplash extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            StarBadge(icon: Icons.cloud_outlined, size: 150),
-            SizedBox(height: 36),
-            SizedBox(
-              width: 160,
-              child: WaveProgressBar(value: 0, indeterminate: true),
-            ),
-            SizedBox(height: 14),
-            Text('Dropify',
+    return Scaffold(
+      body: OrbBackground(
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Breathing(child: OrbIcon(icon: Icons.cloud_rounded, size: 124)),
+              const SizedBox(height: 30),
+              Text(
+                'Dropify',
                 style: TextStyle(
-                    color: AppColors.muted,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 1.2)),
-          ],
+                  color: AppColors.text,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.4,
+                ),
+              ),
+              const SizedBox(height: 26),
+              SizedBox(
+                width: 150,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(AppRadii.pill),
+                  child: const WaveProgressBar(
+                    value: 0,
+                    indeterminate: true,
+                    height: 5,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -7,6 +7,8 @@ import '../l10n/locale_controller.dart';
 import '../services/native_downloads.dart';
 import '../theme/app_theme.dart';
 import '../utils/file_types.dart';
+import '../widgets/kit.dart';
+import '../widgets/motion.dart';
 
 class _PartGroup {
   _PartGroup(this.base, this.extension, this.files);
@@ -154,77 +156,251 @@ class _JoinPartsScreenState extends State<JoinPartsScreen> {
       if (mounted) setState(() => _busy = false);
     }
   }
-
   @override
   Widget build(BuildContext context) {
     final s = context.s;
+    final scheme = AppColors.scheme;
     return Scaffold(
-      appBar: AppBar(
-        title: Text(s.joinParts,
-            style: const TextStyle(fontWeight: FontWeight.w800)),
-      ),
-      body: Column(
-        children: [
-          SwitchListTile(
-            value: _deleteParts,
-            activeColor: AppColors.primary,
-            onChanged: (v) => setState(() => _deleteParts = v),
-            title: Text(s.deletePartsAfter),
-            subtitle: Text(s.deletePartsHint,
-                style: const TextStyle(color: AppColors.muted, fontSize: 12)),
-          ),
-          const Divider(height: 1),
-          Expanded(
-            child: _loading
-                ? const Center(child: CircularProgressIndicator())
-                : _groups.isEmpty
-                    ? Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(32),
-                          child: Text(
-                            s.noPartsFound,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(color: AppColors.muted),
+      body: AuroraBackground(
+        child: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 18, 10),
+                child: Row(
+                  children: [
+                    IconButton.filledTonal(
+                      onPressed: () => Navigator.maybePop(context),
+                      icon: const Icon(Icons.arrow_back_rounded, size: 20),
+                      tooltip:
+                          MaterialLocalizations.of(context).backButtonTooltip,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        s.joinParts,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.3,
+                          color: AppColors.text,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Stagger(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 0, 18, 14),
+                  child: Surface(
+                    radius: AppRadii.xl,
+                    padding: const EdgeInsets.fromLTRB(14, 8, 10, 8),
+                    child: Row(
+                      children: [
+                        GlowIcon(
+                          icon: Icons.delete_sweep_outlined,
+                          size: 42,
+                          color: scheme.primary,
+                        ),
+                        const SizedBox(width: 13),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                s.deletePartsAfter,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.w600,
+                                  height: 1.25,
+                                  color: AppColors.text,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                s.deletePartsHint,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: scheme.onSurfaceVariant,
+                                  fontSize: 11.5,
+                                  height: 1.35,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      )
-                    : ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                        itemCount: _groups.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 10),
-                        itemBuilder: (context, i) {
-                          final group = _groups[i];
-                          return Container(
-                            decoration: BoxDecoration(
-                              color: AppColors.card,
-                              borderRadius: BorderRadius.circular(22),
-                            ),
-                            child: ListTile(
-                              leading: Icon(Icons.merge_type,
-                                  color: AppColors.primary),
-                              title: Text(group.outputName,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis),
-                              subtitle: Text(
-                                '${group.count} ${s.parts} · ${formatSize(group.totalSize)}',
-                                style: const TextStyle(
-                                    color: AppColors.muted, fontSize: 12),
-                              ),
-                              trailing: FilledButton(
-                                style: FilledButton.styleFrom(
-                                  minimumSize: const Size(0, 40),
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 18),
+                        Switch(
+                          value: _deleteParts,
+                          onChanged: (v) => setState(() => _deleteParts = v),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: AnimatedSwitcher(
+                  duration: Motion.base,
+                  switchInCurve: Motion.emphasized,
+                  switchOutCurve: Motion.standard,
+                  child: _loading
+                      ? const Center(
+                          key: ValueKey('loading'),
+                          child: CircularProgressIndicator(),
+                        )
+                      : _groups.isEmpty
+                          ? ListView(
+                              key: const ValueKey('empty'),
+                              padding:
+                                  const EdgeInsets.fromLTRB(18, 4, 18, 30),
+                              children: [
+                                Stagger(
+                                  index: 1,
+                                  child: DashedPanel(
+                                    radius: AppRadii.xl,
+                                    padding: const EdgeInsets.fromLTRB(
+                                        22, 32, 22, 28),
+                                    child: Column(
+                                      children: [
+                                        const OrbIcon(
+                                          icon: Icons.merge_type_rounded,
+                                          size: 100,
+                                        ),
+                                        const SizedBox(height: 18),
+                                        Text(
+                                          s.noPartsFound,
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            color: scheme.onSurfaceVariant,
+                                            fontSize: 13.5,
+                                            height: 1.5,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                 ),
-                                onPressed: _busy ? null : () => _join(group),
-                                child: Text(s.merge),
-                              ),
+                              ],
+                            )
+                          : ListView.separated(
+                              key: const ValueKey('list'),
+                              padding:
+                                  const EdgeInsets.fromLTRB(18, 4, 18, 30),
+                              itemCount: _groups.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(height: 10),
+                              itemBuilder: (context, i) {
+                                final group = _groups[i];
+                                return Stagger(
+                                  index: i,
+                                  step: const Duration(milliseconds: 45),
+                                  child: Surface(
+                                    radius: AppRadii.xl,
+                                    padding: const EdgeInsets.fromLTRB(
+                                        13, 12, 12, 12),
+                                    child: Row(
+                                      children: [
+                                        GlowIcon(
+                                          icon: Icons.merge_type_rounded,
+                                          size: 44,
+                                          color: scheme.primary,
+                                        ),
+                                        const SizedBox(width: 13),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Text(
+                                                group.outputName,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  color: AppColors.text,
+                                                  fontSize: 14.5,
+                                                  fontWeight: FontWeight.w600,
+                                                  letterSpacing: -0.1,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 3),
+                                              Text(
+                                                '${group.count} ${s.parts} · ${formatSize(group.totalSize)}',
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  color:
+                                                      scheme.onSurfaceVariant,
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        _MergeAction(
+                                          label: s.merge,
+                                          onTap: _busy
+                                              ? null
+                                              : () => _join(group),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
-                          );
-                        },
-                      ),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Tombol gabung M3 (filled, tinggi 44); memudar saat tidak aktif.
+class _MergeAction extends StatelessWidget {
+  const _MergeAction({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    return AnimatedOpacity(
+      duration: Motion.fast,
+      opacity: enabled ? 1 : 0.5,
+      child: SizedBox(
+        height: 44,
+        child: FilledButton(
+          onPressed: onTap == null
+              ? null
+              : () {
+                  tapFeedback();
+                  onTap!.call();
+                },
+          style: FilledButton.styleFrom(
+            minimumSize: const Size(0, 44),
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+            shape: const StadiumBorder(),
+            textStyle: const TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+        ),
       ),
     );
   }

@@ -15,19 +15,12 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Edge-to-edge: konten menggambar di belakang status bar & navigation bar.
   await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      systemNavigationBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light,
-      statusBarBrightness: Brightness.dark,
-      systemNavigationBarIconBrightness: Brightness.light,
-      systemNavigationBarContrastEnforced: false,
-      systemStatusBarContrastEnforced: false,
-    ),
-  );
   await LocaleController.instance.load();
   await ThemeController.instance.load();
+  // Status bar mengikuti tampilan aktif (Terang / Gelap / AMOLED).
+  SystemChrome.setSystemUIOverlayStyle(
+    ThemeController.instance.systemOverlayStyle,
+  );
   await AppSettings.instance.load();
   await DownloadHistory.instance.load();
   // Bersihkan sisa potongan upload dari sesi sebelumnya.
@@ -47,7 +40,7 @@ class DropifyApp extends StatelessWidget {
       builder: (context, _) => MaterialApp(
         title: 'Dropify',
         debugShowCheckedModeBanner: false,
-        theme: buildTheme(),
+        theme: buildTheme(themeController.appearance),
         locale: controller.locale,
         supportedLocales: const [Locale('en'), Locale('id')],
         localizationsDelegates: const [
@@ -57,7 +50,10 @@ class DropifyApp extends StatelessWidget {
         ],
         builder: (context, child) => LocaleScope(
           strings: controller.strings,
-          child: child ?? const SizedBox.shrink(),
+          child: AnnotatedRegion<SystemUiOverlayStyle>(
+            value: themeController.systemOverlayStyle,
+            child: child ?? const SizedBox.shrink(),
+          ),
         ),
         home: const StartScreen(),
       ),

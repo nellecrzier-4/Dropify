@@ -1,0 +1,10 @@
+
+# Pratinjau golden (dihasilkan lokal, tidak disimpan)
+test/goldens/
+test/failures/
+
+# Artefak build lokal
+.dart_tool/
+build/
+.flutter-plugins-dependencies
+android/local.properties

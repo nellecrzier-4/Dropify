@@ -57,10 +57,14 @@ abstract class AppStrings {
   String get dynamicColorHint;
   String get amoledBlack;
   String get amoledHint;
+  String get themeLight;
+  String get themeDark;
+  String get themeAmoled;
   String downloadsActive(int count);
   String get savedToFolder;
 
   // Files
+  String get home;
   String get files;
   String get allFiles;
   String get allUploads;
@@ -348,11 +352,23 @@ class StringsId extends AppStrings {
   String get amoledHint => 'Latar hitam pekat, hemat daya di layar OLED.';
 
   @override
+  String get themeLight => 'Terang';
+
+  @override
+  String get themeDark => 'Gelap';
+
+  @override
+  String get themeAmoled => 'AMOLED';
+
+  @override
   String downloadsActive(int count) =>
       count == 1 ? 'Mengunduh 1 file' : 'Mengunduh $count file';
 
   @override
   String get savedToFolder => 'Tersimpan di Download/Dropify';
+
+  @override
+  String get home => 'Beranda';
 
   @override
   String get files => 'Files';
@@ -895,6 +911,15 @@ class StringsEn extends AppStrings {
   String get amoledHint => 'True black background, saves power on OLED screens.';
 
   @override
+  String get themeLight => 'Light';
+
+  @override
+  String get themeDark => 'Dark';
+
+  @override
+  String get themeAmoled => 'AMOLED';
+
+  @override
   String downloadsActive(int count) =>
       count == 1 ? 'Downloading 1 file' : 'Downloading $count files';
 
@@ -902,6 +927,9 @@ class StringsEn extends AppStrings {
   String get savedToFolder => 'Saved to Download/Dropify';
 
   @override
+  @override
+  String get home => 'Home';
+
   String get files => 'Files';
 
   @override

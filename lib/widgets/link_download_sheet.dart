@@ -6,6 +6,8 @@ import '../l10n/locale_controller.dart';
 import '../models/pd_item.dart';
 import '../services/pd_link.dart';
 import '../theme/app_theme.dart';
+import 'kit.dart';
+import 'motion.dart';
 import 'transfers_sheet.dart';
 
 /// Bottom sheet untuk mengunduh file orang lain lewat link Pixeldrain.
@@ -17,7 +19,6 @@ Future<void> showLinkDownloadSheet(
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: AppColors.card,
     builder: (_) => Padding(
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -125,88 +126,130 @@ class _LinkSheetState extends State<_LinkSheet> {
   Widget build(BuildContext context) {
     final s = context.s;
 
+    final scheme = AppColors.scheme;
     return SafeArea(
+      top: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              children: [
-                Icon(Icons.link, color: AppColors.primary),
-                const SizedBox(width: 10),
-                Text(
-                  s.downloadFromLink,
-                  style: const TextStyle(
-                    fontSize: 19,
-                    fontWeight: FontWeight.w800,
+            Stagger(
+              child: Row(
+                children: [
+                  GlowIcon(
+                    icon: Icons.link_rounded,
+                    size: 44,
+                    color: scheme.primary,
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(
-              s.linkAlbumNote,
-              style: const TextStyle(color: AppColors.muted, fontSize: 12.5),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _text,
-              autofocus: true,
-              keyboardType: TextInputType.url,
-              style: const TextStyle(color: AppColors.text),
-              decoration: InputDecoration(
-                hintText: s.linkHint,
-                prefixIcon: const Icon(Icons.public, size: 20),
-                suffixIcon: TextButton(
-                  onPressed: _paste,
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppColors.primary,
-                    shape: const StadiumBorder(),
+                  const SizedBox(width: 13),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          s.downloadFromLink,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: AppColors.text,
+                            fontSize: 19,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          s.linkAlbumNote,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: scheme.onSurfaceVariant,
+                            fontSize: 12,
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  child: Text(s.paste),
-                ),
+                ],
               ),
-              onChanged: (_) {
-                if (_error != null) setState(() => _error = null);
-              },
-              onSubmitted: (_) => _busy ? null : _submit(),
             ),
-            if (_error != null) ...[
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 12,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.danger.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: Text(
-                  _error!,
-                  style: const TextStyle(
-                    color: AppColors.danger,
-                    fontSize: 12.5,
-                    height: 1.4,
-                  ),
-                ),
-              ),
-            ],
             const SizedBox(height: 18),
-            FilledButton(
-              onPressed: _busy ? null : _submit,
-              child: _busy
-                  ? SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.4,
-                        color: AppColors.onPrimary,
+            Stagger(
+              index: 1,
+              child: TextField(
+                controller: _text,
+                autofocus: true,
+                keyboardType: TextInputType.url,
+                style: TextStyle(color: AppColors.text, fontSize: 15),
+                decoration: InputDecoration(
+                  hintText: s.linkHint,
+                  prefixIcon: const Icon(Icons.public_rounded, size: 20),
+                  suffixIcon: TextButton(
+                    onPressed: _paste,
+                    style: TextButton.styleFrom(
+                      foregroundColor: scheme.primary,
+                      shape: const StadiumBorder(),
+                    ),
+                    child: Text(s.paste),
+                  ),
+                ),
+                onChanged: (_) {
+                  if (_error != null) setState(() => _error = null);
+                },
+                onSubmitted: (_) => _busy ? null : _submit(),
+              ),
+            ),
+            AnimatedSize(
+              duration: Motion.base,
+              curve: Motion.emphasized,
+              alignment: Alignment.topCenter,
+              child: _error == null
+                  ? const SizedBox(width: double.infinity)
+                  : Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: scheme.errorContainer,
+                          borderRadius: BorderRadius.circular(AppRadii.md),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(Icons.error_outline_rounded,
+                                color: scheme.onErrorContainer, size: 18),
+                            const SizedBox(width: 9),
+                            Expanded(
+                              child: Text(
+                                _error!,
+                                style: TextStyle(
+                                  color: scheme.onErrorContainer,
+                                  fontSize: 12.5,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    )
-                  : Text(s.download),
+                    ),
+            ),
+            const SizedBox(height: 18),
+            Stagger(
+              index: 2,
+              child: PrimaryButton(
+                label: s.download,
+                icon: Icons.download_rounded,
+                loading: _busy,
+                onPressed: _busy ? null : _submit,
+              ),
             ),
           ],
         ),

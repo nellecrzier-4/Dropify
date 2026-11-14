@@ -2,10 +2,12 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
-import '../models/pd_item.dart';
 import '../l10n/locale_controller.dart';
+import '../models/pd_item.dart';
 import '../theme/app_theme.dart';
 import '../utils/file_types.dart';
+import 'kit.dart';
+import 'motion.dart';
 
 class _Stat {
   final FileCategory category;
@@ -15,6 +17,10 @@ class _Stat {
 }
 
 /// Ringkasan storage dihitung dari file asli di Pixeldrain.
+///
+/// Tampil sebagai kartu tonal Material You ([HeroSurface] = primaryContainer):
+/// ukuran total besar (animasi [AnimatedCount]), jumlah file, bar kategori
+/// bersegment, lalu chip per kategori — semuanya memakai onPrimaryContainer.
 class StorageCard extends StatelessWidget {
   final List<PdItem> files;
   final VoidCallback onTotalTap;
@@ -38,40 +44,58 @@ class StorageCard extends StatelessWidget {
       total += f.size;
     }
     final visible = stats.values.where((s) => s.count > 0).toList();
+    final onTint = AppColors.scheme.onPrimaryContainer;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(24),
-      ),
-      clipBehavior: Clip.antiAlias,
+    return HeroSurface(
+      radius: AppRadii.xl,
+      padding: EdgeInsets.zero,
       child: Column(
         children: [
           InkWell(
-            onTap: onTotalTap,
+            onTap: () {
+              tapFeedback();
+              onTotalTap();
+            },
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 16, 16),
+              padding: const EdgeInsets.fromLTRB(22, 20, 14, 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
-                    crossAxisAlignment: CrossAxisAlignment.baseline,
-                    textBaseline: TextBaseline.alphabetic,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Text(formatSize(total),
-                          style: const TextStyle(
-                              fontSize: 22, fontWeight: FontWeight.w700)),
-                      const SizedBox(width: 8),
                       Expanded(
-                        child: Text(context.s.inFiles(files.length),
-                            style: const TextStyle(
-                                color: AppColors.muted, fontSize: 16)),
+                        child: AnimatedCount(
+                          value: total,
+                          format: (v) => formatSize(v.round()),
+                          style: TextStyle(
+                            color: onTint,
+                            fontSize: 34,
+                            height: 1.05,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.4,
+                          ),
+                        ),
                       ),
-                      const Icon(Icons.chevron_right,
-                          color: AppColors.muted, size: 22),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        color: onTint.withValues(alpha: 0.7),
+                        size: 24,
+                      ),
                     ],
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 6),
+                  Text(
+                    context.s.inFiles(files.length),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: onTint.withValues(alpha: 0.74),
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
                   _SegmentBar(stats: visible, total: total),
                 ],
               ),
@@ -79,42 +103,96 @@ class StorageCard extends StatelessWidget {
           ),
           if (visible.isEmpty)
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 22),
-              child: Text(context.s.noFilesYet,
-                  style: const TextStyle(color: AppColors.muted)),
-            ),
-          for (final s in visible) ...[
-            Divider(height: 1, thickness: 1, color: AppColors.divider),
-            InkWell(
-              onTap: () => onCategoryTap(s.category),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 18, 16, 18),
-                child: Row(
-                  children: [
-                    Icon(s.category.icon, color: s.category.color, size: 28),
-                    const SizedBox(width: 18),
-                    Expanded(
-                      child: Text(s.category.label,
-                          style: const TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.w500)),
-                    ),
-                    Text(
-                        '${s.category.countLabel(s.count)} · ${formatSize(s.size)}',
-                        style: const TextStyle(
-                            color: AppColors.muted, fontSize: 15)),
-                    const SizedBox(width: 4),
-                    const Icon(Icons.chevron_right,
-                        color: AppColors.muted, size: 22),
-                  ],
+              padding: const EdgeInsets.fromLTRB(22, 4, 22, 22),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  context.s.noFilesYet,
+                  style: TextStyle(
+                    color: onTint.withValues(alpha: 0.7),
+                    fontSize: 13.5,
+                  ),
                 ),
               ),
+            )
+          else
+            // Kategori ringkas: chip yang membungkus, jadi tidak ada label
+            // yang terpotong di tepi kartu.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 2, 14, 16),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (var i = 0; i < visible.length; i++)
+                    Stagger(
+                      index: i,
+                      child: _HeroChip(
+                        stat: visible[i],
+                        onTap: () => onCategoryTap(visible[i].category),
+                      ),
+                    ),
+                ],
+              ),
             ),
-          ],
         ],
       ),
     );
   }
 }
+
+/// Chip kategori ringkas di dalam kartu tonal.
+class _HeroChip extends StatelessWidget {
+  const _HeroChip({required this.stat, required this.onTap});
+
+  final _Stat stat;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final onTint = AppColors.scheme.onPrimaryContainer;
+    final tint = chipColor(stat.category.color);
+    return Pressable(
+      onTap: onTap,
+      scale: 0.95,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(10, 8, 12, 8),
+        decoration: BoxDecoration(
+          color: onTint.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(AppRadii.pill),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(stat.category.icon, size: 15, color: tint),
+            const SizedBox(width: 7),
+            Text(
+              '${stat.category.label} · ${formatSize(stat.size)}',
+              style: TextStyle(
+                color: onTint,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w500,
+                letterSpacing: -0.1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Warna kategori yang "duduk" di atas primaryContainer: digeser ke arah
+/// onPrimaryContainer (menggelap di tema terang, menerang di tema gelap).
+Color chipColor(Color c) =>
+    Color.lerp(c, AppColors.scheme.onPrimaryContainer, 0.30)!;
+
+/// Warna batang kategori — versi lebih pekat dari [chipColor].
+Color barColor(Color c) => Color.lerp(
+      c,
+      AppColors.scheme.onPrimaryContainer,
+      AppColors.isDark ? 0.10 : 0.22,
+    )!;
 
 class _SegmentBar extends StatelessWidget {
   final List<_Stat> stats;
@@ -123,20 +201,22 @@ class _SegmentBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final onTint = AppColors.scheme.onPrimaryContainer;
+    final trackColor = onTint.withValues(alpha: 0.12);
     return LayoutBuilder(builder: (context, box) {
       final parts = stats.where((s) => s.size > 0).toList();
       Widget track(Widget? child) => ClipRRect(
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(AppRadii.pill),
             child: Container(
-              height: 8,
-              color: AppColors.divider,
+              height: 10,
+              color: trackColor,
               child: child,
             ),
           );
       if (parts.isEmpty || total == 0) return track(null);
 
       const gap = 3.0;
-      const minW = 5.0;
+      const minW = 6.0;
       final avail = box.maxWidth - gap * (parts.length - 1);
       final widths =
           parts.map((s) => max(minW, avail * s.size / total)).toList();
@@ -149,15 +229,26 @@ class _SegmentBar extends StatelessWidget {
         widths[big] -= (sum - avail);
       }
       return ClipRRect(
-        borderRadius: BorderRadius.circular(6),
-        child: Row(
-          children: [
-            for (var i = 0; i < parts.length; i++) ...[
-              if (i > 0) const SizedBox(width: gap),
-              Container(
-                  width: widths[i], height: 8, color: parts[i].category.color),
+        borderRadius: BorderRadius.circular(AppRadii.pill),
+        child: SizedBox(
+          height: 10,
+          child: Row(
+            children: [
+              for (var i = 0; i < parts.length; i++) ...[
+                if (i > 0) const SizedBox(width: gap),
+                AnimatedContainer(
+                  duration: Motion.slow,
+                  curve: Motion.emphasized,
+                  width: widths[i],
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: barColor(parts[i].category.color),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       );
     });
