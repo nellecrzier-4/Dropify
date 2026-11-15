@@ -389,7 +389,7 @@ class DownloadService extends ChangeNotifier {
       return task;
     }
 
-    if (_useSystemDownloader) {
+    if (_useSystemDownloader && !ProxyService.instance.enabled) {
       // Semua unduhan diserahkan ke DownloadManager Android: berjalan di proses
       // sistem, lanjut walau aplikasi ditutup, dan bisa dipantau ulang setelah
       // aplikasi dibuka kembali.

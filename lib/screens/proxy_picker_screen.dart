@@ -15,7 +15,7 @@ class ProxyPickerScreen extends StatefulWidget {
 
 class _ProxyPickerScreenState extends State<ProxyPickerScreen> {
   final TextEditingController _query = TextEditingController();
-  List<String> _all = const [];
+  List<ProxyCandidate> _all = const [];
   bool _loading = true;
   String? _error;
 
@@ -43,6 +43,8 @@ class _ProxyPickerScreenState extends State<ProxyPickerScreen> {
         _all = list;
         _loading = false;
       });
+      // Ukur latensi bertahap, lalu urutkan yang tercepat lebih dulu.
+      await _measure(list);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -52,10 +54,36 @@ class _ProxyPickerScreenState extends State<ProxyPickerScreen> {
     }
   }
 
-  List<String> get _filtered {
+  Future<void> _measure(List<ProxyCandidate> list) async {
+    const batch = 6;
+    for (var i = 0; i < list.length; i += batch) {
+      final slice = list.skip(i).take(batch).toList();
+      final results = await Future.wait(
+        slice.map((c) => ProxyCatalog.latency(c.address)),
+      );
+      if (!mounted) return;
+      for (var j = 0; j < slice.length; j++) {
+        slice[j].latencyMs = results[j] ?? -1;
+      }
+      setState(() {
+        _all = [..._all]..sort((a, b) {
+            final la = a.latencyMs ?? 1 << 30;
+            final lb = b.latencyMs ?? 1 << 30;
+            if (la != lb) return la.compareTo(lb);
+            return a.country.compareTo(b.country);
+          });
+      });
+    }
+  }
+
+  List<ProxyCandidate> get _filtered {
     final q = _query.text.trim().toLowerCase();
     if (q.isEmpty) return _all;
-    return _all.where((p) => p.toLowerCase().contains(q)).toList();
+    return _all
+        .where((p) =>
+            p.address.toLowerCase().contains(q) ||
+            p.countryName.toLowerCase().contains(q))
+        .toList();
   }
 
   @override
@@ -154,9 +182,11 @@ class _ProxyPickerScreenState extends State<ProxyPickerScreen> {
                               separatorBuilder: (_, __) =>
                                   const SizedBox(height: 8),
                               itemBuilder: (context, i) {
-                                final proxy = items[i];
+                                final candidate = items[i];
+                                final proxy = candidate.address;
                                 final selected =
                                     ProxyService.instance.current == proxy;
+                                final ms = candidate.latencyMs;
                                 return Surface(
                                   radius: AppRadii.lg,
                                   padding: const EdgeInsets.symmetric(
@@ -180,12 +210,51 @@ class _ProxyPickerScreenState extends State<ProxyPickerScreen> {
                                       ),
                                       const SizedBox(width: 12),
                                       Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              proxy,
+                                              style: TextStyle(
+                                                fontSize: 13.5,
+                                                fontWeight: FontWeight.w600,
+                                                color: AppColors.text,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              candidate.countryName,
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: scheme.onSurfaceVariant,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: ms == null
+                                              ? scheme.surfaceContainerHighest
+                                              : ms < 0
+                                                  ? scheme.errorContainer
+                                                  : scheme.primaryContainer,
+                                          borderRadius:
+                                              BorderRadius.circular(99),
+                                        ),
                                         child: Text(
-                                          proxy,
+                                          candidate.latencyLabel,
                                           style: TextStyle(
-                                            fontSize: 13.5,
-                                            fontWeight: FontWeight.w500,
-                                            color: AppColors.text,
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.w700,
+                                            color: ms == null
+                                                ? scheme.onSurfaceVariant
+                                                : ms < 0
+                                                    ? scheme.onErrorContainer
+                                                    : scheme.onPrimaryContainer,
                                           ),
                                         ),
                                       ),

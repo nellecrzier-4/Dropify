@@ -8,7 +8,14 @@ import 'dart:io';
 class ProxyCatalog {
   ProxyCatalog._();
 
-  static const List<String> countries = ['SG', 'ID', 'JP'];
+  /// Urutan negara menurut kedekatan ke pengguna Indonesia.
+  static const List<String> countries = ['ID', 'SG', 'JP'];
+
+  static const Map<String, String> countryNames = {
+    'ID': 'Indonesia',
+    'SG': 'Singapura',
+    'JP': 'Jepang',
+  };
 
   static const String _feed =
       'https://api.proxyscrape.com/v4/free-proxy-list/get'
@@ -16,18 +23,42 @@ class ProxyCatalog {
       '&proxy_format=ipport&format=text';
 
   /// Maksimal [limit] alamat, dibagi dari tiga negara di atas.
-  static Future<List<String>> fetch({int limit = 24}) async {
-    final perCountry = (limit / countries.length).ceil() + 4;
-    final out = <String>[];
+  static Future<List<ProxyCandidate>> fetch({int limit = 24}) async {
+    final perCountry = (limit / countries.length).ceil() + 2;
+    final out = <ProxyCandidate>[];
     for (final cc in countries) {
       final list = await _one(cc);
       for (final item in list.take(perCountry)) {
-        if (!out.contains(item)) out.add(item);
+        if (out.any((p) => p.address == item)) continue;
+        out.add(ProxyCandidate(address: item, country: cc));
         if (out.length >= limit) break;
       }
       if (out.length >= limit) break;
     }
     return out;
+  }
+
+  /// Ukur latensi (ms) satu proxy lewat generate_204; null kalau gagal.
+  static Future<int?> latency(String proxy, {int timeoutSeconds = 4}) async {
+    final client = HttpClient()
+      ..connectionTimeout = Duration(seconds: timeoutSeconds)
+      ..idleTimeout = Duration(seconds: timeoutSeconds);
+    client.findProxy = (_) => 'PROXY $proxy';
+    final watch = Stopwatch()..start();
+    try {
+      final req = await client.getUrl(
+        Uri.parse('https://www.gstatic.com/generate_204'),
+      );
+      final res = await req.close().timeout(Duration(seconds: timeoutSeconds));
+      await res.drain<void>();
+      watch.stop();
+      if (res.statusCode != 204 && res.statusCode != 200) return null;
+      return watch.elapsedMilliseconds;
+    } catch (_) {
+      return null;
+    } finally {
+      client.close(force: true);
+    }
   }
 
   static Future<List<String>> _one(String cc) async {
@@ -58,5 +89,26 @@ class ProxyCatalog {
     if (parts.length != 2) return false;
     final port = int.tryParse(parts[1]);
     return parts[0].isNotEmpty && port != null && port > 0 && port < 65536;
+  }
+}
+
+
+/// Satu alamat proxy beserta negaranya dan hasil ukur latensi.
+class ProxyCandidate {
+  ProxyCandidate({required this.address, required this.country});
+
+  final String address;
+  final String country;
+
+  /// Latensi dalam milidetik; null = belum diukur, -1 = gagal.
+  int? latencyMs;
+
+  String get countryName => ProxyCatalog.countryNames[country] ?? country;
+
+  String get latencyLabel {
+    final ms = latencyMs;
+    if (ms == null) return 'mengukur…';
+    if (ms < 0) return 'gagal';
+    return '$ms ms';
   }
 }
