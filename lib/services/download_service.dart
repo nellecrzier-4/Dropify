@@ -19,6 +19,7 @@ import 'diagnostics.dart';
 import 'transfer_session.dart';
 import 'native_downloads.dart';
 import 'pixeldrain_api.dart';
+import 'pd_session.dart';
 import 'pixeldrain_bypass.dart';
 
 enum DownloadStatus { preparing, queued, downloading, done, error, canceled }
@@ -165,17 +166,21 @@ List<Map<String, String>> _headerVariants(String url) {
   final uri = Uri.tryParse(url);
   final host = uri?.host ?? '';
   final own = host.isEmpty ? null : 'https://$host/';
+  final session = PdSession.instance.cookie;
+  Map<String, String> withSession(Map<String, String> value) => session == null
+      ? value
+      : {...value, 'Cookie': session};
   return [
-    base,
-    {
+    withSession(base),
+    withSession({
       ...base,
       if (own != null) 'Referer': own,
       'Origin': 'https://$host',
-    },
-    {
+    }),
+    withSession({
       for (final e in base.entries)
         if (e.key != 'Referer' && !e.key.startsWith('Origin')) e.key: e.value,
-    },
+    }),
   ];
 }
 
@@ -193,7 +198,7 @@ Map<String, String> _pageHeaders(String url) {
 /// Id berkas dari URL API (`/api/file/<id>?download`) atau halaman `/u/<id>`.
 String? _fileIdFromUrl(String url) => fileIdFromUrl(url);
 
-@visibleForTesting
+/// Id berkas dari URL API (`/api/file/<id>`) atau halaman (`/u/<id>`).
 String? fileIdFromUrl(String url) {
   final uri = Uri.tryParse(url);
   if (uri == null) return null;
@@ -1335,10 +1340,14 @@ class DownloadService extends ChangeNotifier {
       throw _RetryableError(_s.invalidRange);
     }
     if (code != 200 && code != 206) {
+      final captcha = bodyHint != null &&
+          bodyHint.toLowerCase().contains('captcha');
       throw PixeldrainException(
-        code == 403 && (bodyHint?.isNotEmpty ?? false)
-            ? 'HTTP 403 · $bodyHint'
-            : 'HTTP $code',
+        captcha
+            ? 'captcha_required'
+            : (code == 403 && (bodyHint?.isNotEmpty ?? false)
+                ? 'HTTP 403 · $bodyHint'
+                : 'HTTP $code'),
       );
     }
 
@@ -1597,9 +1606,10 @@ class DownloadService extends ChangeNotifier {
       final code = res.statusCode ?? 0;
       if (code != 200 && code != 206) {
         final body = (res.data ?? '').toLowerCase();
-        if (body.contains('captcha_required') ||
-            body.contains('rate_limited') ||
-            body.contains('hotlink')) {
+        if (body.contains('captcha')) {
+          return ProbeResult.fail('captcha_required');
+        }
+        if (body.contains('rate_limited') || body.contains('hotlink')) {
           return ProbeResult.fail('rate_limited');
         }
         return ProbeResult.fail('HTTP $code');

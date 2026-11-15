@@ -7,6 +7,7 @@ import '../l10n/locale_controller.dart';
 import '../utils/errors.dart';
 import '../screens/settings_screen.dart';
 import '../services/download_service.dart';
+import '../screens/pd_captcha_screen.dart';
 import '../services/native_downloads.dart';
 import '../theme/app_theme.dart';
 import '../utils/file_types.dart';
@@ -387,6 +388,25 @@ class _DownloadsTab extends StatelessWidget {
               const SizedBox(height: 10),
               ...staggered(
                 <Widget>[
+                  if (task.error == 'captcha_required')
+                    _DetailAction(
+                      icon: Icons.verified_user_outlined,
+                      title: 'Verifikasi captcha',
+                      subtitle: 'Selesaikan di halaman Pixeldrain, lalu unduh ulang',
+                      onTap: () async {
+                        Navigator.pop(sheetContext);
+                        final id = (task.item.id ?? '').trim().isNotEmpty
+                            ? task.item.id!
+                            : (fileIdFromUrl(task.url ?? task.directUrl) ?? '');
+                        if (id.isEmpty) return;
+                        final ok = await Navigator.of(context).push<bool>(
+                          MaterialPageRoute<bool>(
+                            builder: (_) => PdCaptchaScreen(fileId: id),
+                          ),
+                        );
+                        if (ok == true) controller.downloads.retry(task.id);
+                      },
+                    ),
                   if (task.url != null)
                     _DetailAction(
                       icon: Icons.link_rounded,
