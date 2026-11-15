@@ -288,24 +288,12 @@ class MainActivity : FlutterActivity() {
                             }
                             result.success(true)
                         }
-                        "startTransferService" -> {
-                            TransferService.start(
-                                this,
-                                call.argument<String>("text") ?: "Transfer berjalan",
-                            )
-                            result.success(true)
-                        }
-                        "updateTransferService" -> {
-                            TransferService.update(
-                                this,
-                                call.argument<String>("text") ?: "Transfer berjalan",
-                            )
-                            result.success(true)
-                        }
-                        "stopTransferService" -> {
-                            TransferService.stop(this)
-                            result.success(true)
-                        }
+                        // Foreground service sudah tidak dipakai: kuota dataSync
+                        // Android membuatnya berbahaya (exception mematikan
+                        // proses). Unduhan ditangani DownloadManager.
+                        "startTransferService",
+                        "updateTransferService",
+                        "stopTransferService" -> result.success(true)
                         "restartApp" -> {
                             recreate()
                             result.success(true)

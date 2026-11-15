@@ -39,10 +39,15 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
-        <service
-            android:name=".TransferService"
-            android:foregroundServiceType="dataSync"
-            android:exported="false" />
+        <!--
+          Tidak ada foreground service. Android membatasi kuota FGS tipe
+          dataSync (6 jam/24 jam); setelah habis, startForeground() melempar
+          ForegroundServiceStartNotAllowedException dan sistem mematikan proses,
+          sementara service yang masih hidup kena
+          ForegroundServiceDidNotStopInTimeException. Unduhan memakai
+          DownloadManager (proses sistem, tanpa service kita), unggahan berjalan
+          di proses aplikasi tanpa FGS.
+        -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
