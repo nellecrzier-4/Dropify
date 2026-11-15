@@ -207,17 +207,23 @@ class DownloadService extends ChangeNotifier {
         _folderOverride = folderOverride,
         _parallelMinSize = parallelMinSize,
         _minSegmentSize = minSegmentSize,
-        _dio = dio ??
-            Dio(
-              BaseOptions(
-                connectTimeout: const Duration(seconds: 20),
-                receiveTimeout: null,
-                followRedirects: true,
-                maxRedirects: 6,
-              ),
-            )..httpClientAdapter = IOHttpClientAdapter(
-                createHttpClient: () => ProxyService.instance.createHttpClient(),
-              );
+        _dio = dio ?? _buildDio();
+
+  /// Dio bawaan: memakai proxy pengguna kalau diaktifkan di Settings.
+  static Dio _buildDio() {
+    final dio = Dio(
+      BaseOptions(
+        connectTimeout: const Duration(seconds: 20),
+        receiveTimeout: null,
+        followRedirects: true,
+        maxRedirects: 6,
+      ),
+    );
+    dio.httpClientAdapter = IOHttpClientAdapter(
+      createHttpClient: () => ProxyService.instance.createHttpClient(),
+    );
+    return dio;
+  }
 
   final PixeldrainApi api;
   final ProbeFn? _probeOverride;

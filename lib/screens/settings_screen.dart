@@ -35,10 +35,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _showProxy() async {
-    final controller = TextEditingController(
-      text: ProxyService.instance.proxies.join('\n'),
-    );
-    var enabled = ProxyService.instance.enabled;
+    final proxy = ProxyService.instance;
+    final controller = TextEditingController(text: proxy.proxies.join('\n'));
+    var enabled = proxy.enabled;
+    var auto = proxy.auto;
+
     await showDialog<void>(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -46,46 +47,70 @@ class _SettingsScreenState extends State<SettingsScreen> {
           title: const Text('Proxy unduhan'),
           content: SizedBox(
             width: double.maxFinite,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Satu proxy per baris: host:port. Kalau server membalas 429 '
-                  'atau 403, aplikasi pindah ke proxy berikutnya lalu mencoba '
-                  'lagi. 404 tidak diputar (berkasnya memang tidak ada).',
-                  style: TextStyle(fontSize: 12),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: controller,
-                  maxLines: 5,
-                  decoration: const InputDecoration(
-                    hintText: '127.0.0.1:8080\n10.0.0.2:3128',
-                    border: OutlineInputBorder(),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SwitchListTile(
+                    value: enabled,
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Pakai proxy'),
+                    onChanged: (v) => setLocal(() => enabled = v),
                   ),
-                ),
-                const SizedBox(height: 8),
-                SwitchListTile(
-                  value: enabled,
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Pakai proxy'),
-                  onChanged: (v) => setLocal(() => enabled = v),
-                ),
-              ],
+                  SwitchListTile(
+                    value: auto,
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Proxy otomatis (SG/ID/Jepang)'),
+                    subtitle: Text(
+                      proxy.autoPool.isEmpty
+                          ? 'Ambil dan uji proxy publik dari tiga negara itu'
+                          : '${proxy.autoPool.length} proxy lolos uji',
+                      style: const TextStyle(fontSize: 11.5),
+                    ),
+                    onChanged: (v) => setLocal(() => auto = v),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Proxy manual (satu per baris, host:port). Kalau diisi, '
+                    'daftar ini yang dipakai; kalau kosong, proxy otomatis.',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: controller,
+                    maxLines: 4,
+                    decoration: const InputDecoration(
+                      hintText: '127.0.0.1:8080',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Proxy publik dijalankan pihak lain: isi HTTPS tetap '
+                    'terenkripsi, tapi alamat IP-mu terlihat oleh mereka.',
+                    style: TextStyle(fontSize: 11),
+                  ),
+                ],
+              ),
             ),
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Batal'),
-            ),
-            TextButton(
               onPressed: () async {
-                await ProxyService.instance.setList(controller.text);
-                await ProxyService.instance.setEnabled(enabled);
+                await proxy.setList(controller.text);
+                await proxy.setAuto(auto);
+                await proxy.setEnabled(enabled);
+                final count = proxy.activeProxies.length;
                 if (ctx.mounted) Navigator.of(ctx).pop();
-                if (mounted) setState(() {});
+                if (mounted) {
+                  showAppSnack(
+                    context,
+                    count == 0
+                        ? 'Belum ada proxy yang lolos uji.'
+                        : '$count proxy siap dipakai.',
+                  );
+                }
               },
               child: const Text('Simpan'),
             ),
