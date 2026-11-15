@@ -158,6 +158,27 @@ const Map<String, String> _browserHeaders = {
 /// Header permintaan yang menyerupai browser yang membuka halaman berkas itu
 /// sendiri: proteksi hotlink Pixeldrain menolak referer yang tidak wajar,
 /// jadi Referer/Origin diarahkan ke halaman berkasnya.
+/// Varian Referer yang dicoba berurutan saat server menolak (403):
+/// halaman berkas, domain host itu sendiri, lalu tanpa Referer sama sekali.
+List<Map<String, String>> _headerVariants(String url) {
+  final base = _pageHeaders(url);
+  final uri = Uri.tryParse(url);
+  final host = uri?.host ?? '';
+  final own = host.isEmpty ? null : 'https://$host/';
+  return [
+    base,
+    {
+      ...base,
+      if (own != null) 'Referer': own,
+      'Origin': 'https://$host',
+    },
+    {
+      for (final e in base.entries)
+        if (e.key != 'Referer' && !e.key.startsWith('Origin')) e.key: e.value,
+    },
+  ];
+}
+
 Map<String, String> _pageHeaders(String url) {
   final id = _fileIdFromUrl(url);
   final referer =
@@ -1267,27 +1288,46 @@ class DownloadService extends ChangeNotifier {
       start = 0;
     }
 
-    final headers = <String, String>{..._pageHeaders(url), 'Accept': '*/*'};
-    if (start > 0) headers['Range'] = 'bytes=$start-';
-    headers.addAll(task.extraHeaders);
-    if (!task.viaBypass) headers.addAll(task.directHeaders);
-
     final token = CancelToken();
     task.cancelToken = token;
 
-    final response = await _dio.get<ResponseBody>(
+    // Coba beberapa varian Referer: sebagian CDN menolak referer yang tidak
+    // cocok dengan halaman berkas (proteksi hotlink).
+    Response<ResponseBody>? response;
+    var code = 0;
+    String? bodyHint;
+    for (final variant in _headerVariants(url)) {
+      final headers = <String, String>{...variant, 'Accept': '*/*'};
+      if (start > 0) headers['Range'] = 'bytes=$start-';
+      headers.addAll(task.extraHeaders);
+      if (!task.viaBypass) headers.addAll(task.directHeaders);
+
+      response = await _dio.get<ResponseBody>(
+        url,
+        options: Options(
+          headers: headers,
+          responseType: ResponseType.stream,
+          validateStatus: (_) => true,
+          receiveTimeout: null,
+        ),
+        cancelToken: token,
+      );
+      code = response.statusCode ?? 0;
+      _log('http', '${task.name}: $code start=$start '
+          'referer=${variant['Referer'] ?? '-'}');
+      if (code != 403) break;
+      // Simpan petunjuk isi balasan sekali, supaya pesan errornya jelas.
+      bodyHint ??= await _peekBody(response.data!);
+    }
+    response ??= await _dio.get<ResponseBody>(
       url,
       options: Options(
-        headers: headers,
         responseType: ResponseType.stream,
         validateStatus: (_) => true,
         receiveTimeout: null,
       ),
       cancelToken: token,
     );
-
-    final code = response.statusCode ?? 0;
-    _log('http', '${task.name}: $code start=$start');
     if (code == 416) {
       try {
         await part.delete();
@@ -1295,7 +1335,11 @@ class DownloadService extends ChangeNotifier {
       throw _RetryableError(_s.invalidRange);
     }
     if (code != 200 && code != 206) {
-      throw PixeldrainException('HTTP $code');
+      throw PixeldrainException(
+        code == 403 && (bodyHint?.isNotEmpty ?? false)
+            ? 'HTTP 403 · $bodyHint'
+            : 'HTTP $code',
+      );
     }
 
     final resuming = code == 206 && start > 0;
@@ -1380,6 +1424,21 @@ class DownloadService extends ChangeNotifier {
         );
       }
       _notify();
+    }
+  }
+
+  /// Baca maksimal 300 byte pertama balasan (untuk pesan error 403).
+  Future<String> _peekBody(ResponseBody body) async {
+    try {
+      final bytes = <int>[];
+      await for (final chunk in body.stream) {
+        bytes.addAll(chunk.take(300 - bytes.length));
+        if (bytes.length >= 300) break;
+      }
+      final text = String.fromCharCodes(bytes).replaceAll(RegExp(r'\s+'), ' ').trim();
+      return text.length > 160 ? text.substring(0, 160) : text;
+    } catch (_) {
+      return '';
     }
   }
 
