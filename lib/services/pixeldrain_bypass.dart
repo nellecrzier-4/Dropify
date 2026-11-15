@@ -45,6 +45,15 @@ class PixeldrainBypass {
   /// Halaman publik layanan bypass (dipakai untuk tombol "Buka di browser").
   static const String serviceUrl = 'https://pixeldrain-bypass.gamedrive.org/';
 
+  /// Pilihan mirror yang dikenal aplikasi (nama, host).
+  static const List<Map<String, String>> mirrors = [
+    {
+      'name': 'Gamedrive (cdn.pixeldrain.eu.cc)',
+      'host': 'cdn.pixeldrain.eu.cc',
+    },
+    {'name': 'Speed-Drain', 'host': 'speed-drain.com'},
+  ];
+
   static String _mirror = defaultMirror;
   static bool _enabled = true;
 
@@ -53,7 +62,17 @@ class PixeldrainBypass {
   /// Kalau false, aplikasi memakai link Pixeldrain biasa.
   static bool get enabled => _enabled;
 
-  static void configure({String? mirror, bool? enabled}) {
+  /// Simpan pilihan mirror + sakelar; bertahan setelah aplikasi ditutup.
+  static Future<void> configure({String? mirror, bool? enabled}) async {
+    _apply(mirror: mirror, enabled: enabled);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_prefMirror, _mirror);
+      await prefs.setBool(_prefEnabled, _enabled);
+    } catch (_) {}
+  }
+
+  static void _apply({String? mirror, bool? enabled}) {
     if (mirror != null && mirror.trim().isNotEmpty) {
       _mirror = mirror.trim().replaceAll(RegExp(r'^https?://'), '').replaceAll('/', '');
     }

@@ -6,6 +6,7 @@ import '../l10n/locale_controller.dart';
 import '../services/app_settings.dart';
 import '../services/pd_link.dart';
 import '../services/pixeldrain_api.dart';
+import '../services/pixeldrain_bypass.dart';
 import '../theme/app_theme.dart';
 import '../widgets/kit.dart';
 import '../widgets/link_download_sheet.dart';
@@ -94,6 +95,17 @@ class _HomeScreenState extends State<HomeScreen> {
             },
           ),
           _SheetAction(
+            icon: Icons.bolt_rounded,
+            title: 'Bypass unduhan',
+            subtitle: PixeldrainBypass.enabled
+                ? 'Aktif · ${PixeldrainBypass.mirror}'
+                : 'Nonaktif · server Pixeldrain',
+            onTap: () {
+              Navigator.pop(sheetContext);
+              _showBypassPicker();
+            },
+          ),
+          _SheetAction(
             icon: Icons.link_rounded,
             title: s.downloadFromLink,
             subtitle: s.linkAlbumNote,
@@ -106,6 +118,43 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
     if (mounted) setState(() => _addOpen = false);
+  }
+
+  Future<void> _showBypassPicker() async {
+    await showExpressiveSheet<void>(
+      context: context,
+      builder: (sheetContext) => _AddMenuSheet(
+        title: 'Bypass unduhan',
+        children: [
+          for (final mirror in PixeldrainBypass.mirrors)
+            _SheetAction(
+              icon: Icons.speed_rounded,
+              title: mirror['name']!,
+              subtitle: mirror['host']!,
+              onTap: () async {
+                await PixeldrainBypass.configure(
+                  mirror: mirror['host'],
+                  enabled: true,
+                );
+                if (sheetContext.mounted) Navigator.pop(sheetContext);
+                if (mounted) {
+                  showAppSnack(context, 'Bypass aktif · ${mirror['name']}');
+                }
+              },
+            ),
+          _SheetAction(
+            icon: Icons.public_rounded,
+            title: 'Server Pixeldrain langsung',
+            subtitle: 'Tanpa mirror',
+            onTap: () async {
+              await PixeldrainBypass.setEnabled(false);
+              if (sheetContext.mounted) Navigator.pop(sheetContext);
+              if (mounted) showAppSnack(context, 'Bypass dimatikan');
+            },
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _upload() async {

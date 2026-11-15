@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 
 /// Mengambil kandidat proxy publik dari tiga negara (SG/ID/JP) tanpa mengujinya.
@@ -17,10 +16,10 @@ class ProxyCatalog {
     'JP': 'Jepang',
   };
 
+  /// Sumber: proxifly/free-proxy-list — daftar per negara, teks polos.
   static const String _feed =
-      'https://api.proxyscrape.com/v4/free-proxy-list/get'
-      '?request=display_proxies&country={cc}&protocol=http'
-      '&proxy_format=ipport&format=text';
+      'https://raw.githubusercontent.com/proxifly/free-proxy-list/main/'
+      'proxies/countries/{cc}/data.txt';
 
   /// Maksimal [limit] alamat, dibagi dari tiga negara di atas.
   static Future<List<ProxyCandidate>> fetch({int limit = 24}) async {
@@ -72,10 +71,15 @@ class ProxyCatalog {
         return const [];
       }
       final body = await res.transform(const SystemEncoding().decoder).join();
-      return [
-        for (final line in body.split('\n'))
-          if (_valid(line.trim())) line.trim(),
-      ];
+      final out = <String>[];
+      for (final raw in body.split('\n')) {
+        final line = raw.trim();
+        // Ambil hanya proxy HTTP/HTTPS; SOCKS tidak didukung findProxy Dart.
+        if (line.startsWith('socks')) continue;
+        final plain = line.replaceFirst(RegExp(r'^https?://'), '');
+        if (_valid(plain) && !out.contains(plain)) out.add(plain);
+      }
+      return out;
     } catch (_) {
       return const [];
     } finally {
