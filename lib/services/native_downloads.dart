@@ -187,6 +187,59 @@ class NativeDownloads {
     }
   }
 
+  /// Callback progres dari downloader native (FileDownloader.kt).
+  static bool _listenerAttached = false;
+
+  static void _attachListener() {
+    if (_listenerAttached) return;
+    _listenerAttached = true;
+    _channel.setMethodCallHandler((call) async {
+      if (call.method != 'downloadProgress') return null;
+      final raw = call.arguments;
+      if (raw is Map) {
+        _onNativeEvent(Map<String, dynamic>.from(raw));
+      }
+      return null;
+    });
+  }
+
+  static void _onNativeEvent(Map<String, dynamic> event) {
+    try {
+      onNativeProgress?.call(event);
+    } catch (_) {}
+  }
+
+  static void Function(Map<String, dynamic> event)? onNativeProgress;
+
+  /// Mulai unduhan di proses native (tanpa menulis dari Dart).
+  static Future<bool> startNativeDownload({
+    required String id,
+    required String url,
+    required String name,
+    Map<String, String> headers = const {},
+  }) async {
+    _attachListener();
+    try {
+      return await _channel.invokeMethod<bool>('downloadStart', {
+            'id': id,
+            'url': url,
+            'name': name,
+            'headers': headers,
+          }) ??
+          false;
+    } on PlatformException {
+      return false;
+    } on MissingPluginException {
+      return false;
+    }
+  }
+
+  static Future<void> cancelNativeDownload(String id) async {
+    try {
+      await _channel.invokeMethod<bool>('downloadCancel', {'id': id});
+    } catch (_) {}
+  }
+
   /// Path nyata + nama + ukuran dari URI pemilih berkas.
   ///
   /// Kalau provider tidak memberi path (mis. dokumen di cloud), berkas disalin

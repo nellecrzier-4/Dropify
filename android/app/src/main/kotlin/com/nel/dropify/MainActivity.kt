@@ -34,6 +34,7 @@ import java.io.File
 class MainActivity : FlutterActivity() {
 
     private val channelName = "com.nel.dropify/native"
+    private var nativeChannel: MethodChannel? = null
     private var pendingPermission: MethodChannel.Result? = null
     private var pendingPicker: MethodChannel.Result? = null
 
@@ -242,7 +243,9 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName)
+        val channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName)
+        nativeChannel = channel
+        channel
             .setMethodCallHandler { call, result ->
                 try {
                     when (call.method) {
@@ -319,6 +322,31 @@ class MainActivity : FlutterActivity() {
                             result.success(true)
                         }
                         "freeSpace" -> result.success(freeSpace())
+                        "downloadStart" -> {
+                            val id = call.argument<String>("id") ?: ""
+                            val url = call.argument<String>("url") ?: ""
+                            val name = call.argument<String>("name") ?: "file"
+                            if (id.isEmpty() || url.isEmpty()) {
+                                result.error("bad_args", "id/url kosong", null)
+                            } else {
+                                FileDownloader.start(
+                                    this,
+                                    id,
+                                    url,
+                                    name,
+                                    headersFrom(call.argument<Map<String, String>>("headers")),
+                                ) { event ->
+                                    runOnUiThread {
+                                        nativeChannel?.invokeMethod("downloadProgress", event)
+                                    }
+                                }
+                                result.success(true)
+                            }
+                        }
+                        "downloadCancel" -> {
+                            FileDownloader.cancel(call.argument<String>("id") ?: "")
+                            result.success(true)
+                        }
                         "appVersion" -> result.success(appVersion())
                         "resolveDocument" -> resolveDocument(
                             call.argument<String>("uri"),

@@ -289,23 +289,14 @@ class DownloadService extends ChangeNotifier {
     }
 
     if (urlOverride != null && _useSystemDownloader) {
-      final handled = await _runSystemDownload(task, urlOverride, headers);
+      final handled = await _runNativeDownload(task, urlOverride, headers);
       if (handled) return task;
-
-      // DownloadManager tidak tersedia. Unduhan besar lewat proses aplikasi
-      // pernah membuat sistem kehabisan I/O dan aplikasi lain ikut mati, jadi
-      // hanya berkas kecil yang boleh memakai jalur cadangan.
-      final probe = await _probeUrl(urlOverride, headers);
-      if (probe.size > 2 * 1024 * 1024 * 1024) {
-        task
-          ..status = DownloadStatus.error
-          ..error = _s.systemDownloaderRequired
-          ..endedAt = DateTime.now();
-        _log('native', '${task.name}: ${probe.size} byte, unduhan sistem gagal dipakai');
-        _notify();
-        return task;
-      }
-      _log('native', '${task.name}: pakai downloader app (${probe.size} byte)');
+      task
+        ..status = DownloadStatus.error
+        ..error = _s.downloaderUnavailable
+        ..endedAt = DateTime.now();
+      _notify();
+      return task;
     }
 
     await _resolveAndRun(task);
@@ -316,73 +307,44 @@ class DownloadService extends ChangeNotifier {
   ///
   /// Mengembalikan false hanya kalau enqueue gagal total (mis. kanal native
   /// tidak ada), supaya pemanggil bisa memakai downloader di dalam app.
-  Future<bool> _runSystemDownload(
+  /// Unduhan URL luar dijalankan sepenuhnya oleh kode native
+  /// ([FileDownloader]) — Dart hanya menerima kejadian progres. Dengan begitu
+  /// memori aplikasi tidak tumbuh mengikuti ukuran berkas, dan WebView tidak
+  /// ikut menahan unduhan.
+  Future<bool> _runNativeDownload(
     DownloadTask task,
     String url,
     Map<String, String> headers,
   ) async {
-    NativeDownloadHandle handle;
-    try {
-      handle = await NativeDownloads.enqueue(
-        url: url,
-        name: task.name,
-        headers: headers,
-      );
-    } catch (e) {
-      _log('native', '${task.name}: enqueue gagal ($e)');
-      return false;
-    }
-
-    task
-      ..status = DownloadStatus.downloading
-      ..viaSystem = true
-      ..path = handle.path
-      ..startedAt = DateTime.now()
-      ..url = url;
-    _log('native', '${task.name}: DownloadManager #${handle.id}');
-    _notifyUi();
-
+    final done = Completer<bool>();
+    final startedAt = DateTime.now();
     var lastReceived = 0;
-    var lastTime = DateTime.now();
-    var missing = 0;
+    var lastCheck = startedAt;
 
-    while (!_disposed) {
-      if (task.canceled) {
-        await NativeDownloads.cancel(handle.id);
-        return true;
-      }
-      await Future<void>.delayed(const Duration(seconds: 1));
-      final state = await NativeDownloads.query(handle.id);
-      if (state == null) {
-        // Kanal tidak menjawab: hentikan pemantauan, jangan menggandakan unduhan.
-        if (++missing >= 3) {
-          task
-            ..status = DownloadStatus.error
-            ..error = _s.downloaderUnavailable
-            ..endedAt = DateTime.now();
-          _notifyUi();
-          return true;
-        }
-        continue;
-      }
-      missing = 0;
+    NativeDownloads.onNativeProgress = (event) {
+      if (event['id']?.toString() != task.id) return;
+      final state = event['state']?.toString() ?? '';
+      final received = (event['received'] as num?)?.toInt() ?? 0;
+      final total = (event['total'] as num?)?.toInt() ?? 0;
 
-      if (state.total > 0) task.size = state.total;
-      task.received = state.received;
+      if (total > 0) task.size = total;
+      task.received = received;
       final now = DateTime.now();
-      final seconds = now.difference(lastTime).inSeconds;
-      if (seconds >= 1) {
-        final delta = state.received - lastReceived;
+      final seconds = now.difference(lastCheck).inMilliseconds / 1000;
+      if (seconds >= 0.5) {
+        final delta = received - lastReceived;
         task.speed = delta <= 0 ? 0 : delta / seconds;
-        lastReceived = state.received;
-        lastTime = now;
+        lastReceived = received;
+        lastCheck = now;
       }
       _notifyUi();
 
-      if (state.isDone) {
+      if (state == 'done') {
         task
           ..status = DownloadStatus.done
-          ..received = task.size > 0 ? task.size : state.received
+          ..received = total > 0 ? total : received
+          ..size = total > 0 ? total : received
+          ..path = event['path']?.toString() ?? task.path
           ..speed = 0
           ..endedAt = DateTime.now();
         _log('native', '${task.name}: selesai ${task.received} byte');
@@ -394,21 +356,63 @@ class DownloadService extends ChangeNotifier {
             time: DateTime.now(),
           ),
         );
+        NativeDownloads.notifyDownload(
+          id: task.notifyId,
+          title: task.name,
+          text: formatSize(task.size),
+          progress: 1,
+          done: true,
+        );
         _notifyUi();
-        return true;
-      }
-      if (state.isFailed) {
+        if (!done.isCompleted) done.complete(true);
+      } else if (state == 'failed') {
         task
           ..status = DownloadStatus.error
-          ..error = state.error ?? _s.downloadFailed
+          ..error = event['error']?.toString() ?? _s.downloadFailed
           ..speed = 0
           ..endedAt = DateTime.now();
         _log('native', '${task.name}: gagal ${task.error}');
+        NativeDownloads.notifyDownload(
+          id: task.notifyId,
+          title: task.name,
+          text: '',
+          progress: 0,
+          error: task.error,
+        );
         _notifyUi();
-        return true;
+        if (!done.isCompleted) done.complete(true);
       }
-      _notifyUi();
+    };
+
+    final started = await NativeDownloads.startNativeDownload(
+      id: task.id,
+      url: url,
+      name: task.name,
+      headers: headers,
+    );
+    if (!started) {
+      NativeDownloads.onNativeProgress = null;
+      _log('native', '${task.name}: downloader native menolak');
+      return false;
     }
+
+    task
+      ..status = DownloadStatus.downloading
+      ..viaSystem = true
+      ..startedAt = startedAt
+      ..url = url;
+    _log('native', '${task.name}: native ${_short(url)}');
+    _notify();
+
+    while (!done.isCompleted && !_disposed) {
+      if (task.canceled) {
+        await NativeDownloads.cancelNativeDownload(task.id);
+        if (!done.isCompleted) done.complete(true);
+        break;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+    }
+    NativeDownloads.onNativeProgress = null;
     return true;
   }
 
@@ -492,6 +496,11 @@ class DownloadService extends ChangeNotifier {
   Future<void> _resumeTask(DownloadTask task) async {
     if (!await _ensureStorage()) {
       _fail(task, 'storage_permission');
+      return;
+    }
+    final url = task.urlOverride;
+    if (url != null) {
+      await _runNativeDownload(task, url, task.extraHeaders);
       return;
     }
     await _resolveAndRun(task);

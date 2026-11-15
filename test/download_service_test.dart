@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:dropify/models/pd_item.dart';
 import 'package:dropify/services/download_service.dart';
+import 'package:dropify/services/native_downloads.dart';
 import 'package:dropify/services/pixeldrain_api.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -94,6 +95,10 @@ void main() {
           return true;
         case 'cancelNotification':
           return true;
+        case 'downloadStart':
+          return true;
+        case 'downloadCancel':
+          return true;
         case 'enqueue':
           return systemEnqueueReply;
         case 'query':
@@ -123,6 +128,8 @@ void main() {
       PixeldrainApi(),
       dio: dio,
       folderOverride: dir.path,
+      // Tes ini menguji downloader Dart, bukan FileDownloader native.
+      useSystemDownloader: false,
       parallelMinSize: parallel ? 8 * 1024 : 1024 * 1024 * 1024,
       minSegmentSize: 4 * 1024,
       probe: (url, headers) async => ProbeResult.ok(
@@ -293,25 +300,42 @@ void main() {
     await dir.delete(recursive: true);
   });
 
-  test('URL luar diserahkan ke DownloadManager bila tersedia', () async {
+  test('URL luar memakai downloader native bila tersedia', () async {
     final dir = await Directory.systemTemp.createTemp('dropify_dl');
     final adapter = _FakeAdapter(total: 64 * 1024);
-    final service = await makeService(adapter, dir);
+    final dio = Dio()..httpClientAdapter = adapter;
+    final service = DownloadService(
+      PixeldrainApi(),
+      dio: dio,
+      folderOverride: dir.path,
+    );
 
-    systemEnqueueReply = {
-      'id': 77,
-      'name': 'goweb.bin',
-      'path': '/storage/emulated/0/Download/Dropify/goweb.bin',
-    };
-    systemQueryReply = {'state': 'done', 'received': 4096, 'total': 4096};
-
-    final task = await service.download(
+    final future = service.download(
       const PdItem(name: 'goweb.bin', size: 0),
       urlOverride: 'https://store-eu-par-1.gofile.io/download/web/a/goweb.bin',
     );
 
-    expect(task!.status, DownloadStatus.done, reason: task.error ?? '');
-    expect(task.path, '/storage/emulated/0/Download/Dropify/goweb.bin');
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    final task = service.tasks.first;
+    expect(task.viaSystem, isTrue);
+
+    NativeDownloads.onNativeProgress?.call({
+      'id': task.id,
+      'state': 'running',
+      'received': 32 * 1024,
+      'total': 64 * 1024,
+    });
+    NativeDownloads.onNativeProgress?.call({
+      'id': task.id,
+      'state': 'done',
+      'received': 64 * 1024,
+      'total': 64 * 1024,
+      'path': '/storage/emulated/0/Download/Dropify/goweb.bin',
+    });
+
+    final done = await future;
+    expect(done!.status, DownloadStatus.done, reason: done.error ?? '');
+    expect(done.path, '/storage/emulated/0/Download/Dropify/goweb.bin');
     expect(adapter.calls, 0, reason: 'tidak boleh memakai downloader Dart');
 
     service.dispose();
