@@ -9,6 +9,7 @@ import 'screens/start_screen.dart';
 import 'services/app_settings.dart';
 import 'services/cache_cleaner.dart';
 import 'services/diagnostics.dart';
+import 'services/proxy_service.dart';
 import 'theme/app_theme.dart';
 import 'theme/theme_controller.dart';
 
@@ -26,6 +27,7 @@ Future<void> main() async {
     ThemeController.instance.systemOverlayStyle,
   );
   await AppSettings.instance.load();
+  await ProxyService.instance.load();
   await DownloadHistory.instance.load();
   // Berkas yang selesai tanpa aplikasi (mis. lewat DownloadManager) tetap
   // muncul di riwayat saat aplikasi dibuka.

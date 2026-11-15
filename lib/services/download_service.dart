@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -13,6 +14,7 @@ import '../l10n/locale_controller.dart';
 import '../models/pd_item.dart';
 import '../utils/file_types.dart';
 import 'app_settings.dart';
+import 'proxy_service.dart';
 import 'diagnostics.dart';
 import 'transfer_session.dart';
 import 'native_downloads.dart';
@@ -213,7 +215,9 @@ class DownloadService extends ChangeNotifier {
                 followRedirects: true,
                 maxRedirects: 6,
               ),
-            );
+            )..httpClientAdapter = IOHttpClientAdapter(
+                createHttpClient: () => ProxyService.instance.createHttpClient(),
+              );
 
   final PixeldrainApi api;
   final ProbeFn? _probeOverride;
@@ -960,6 +964,12 @@ class DownloadService extends ChangeNotifier {
       } catch (e) {
         lastError = e;
         if (task.canceled) return;
+        final text = e.toString();
+        if (text.contains('429') || text.contains('403')) {
+          if (ProxyService.instance.rotate()) {
+            _log('proxy', 'putar ke ${ProxyService.instance.current} (unduhan)');
+          }
+        }
         if (attempt >= 4) break;
 
         task.waiting = true;
@@ -1444,6 +1454,14 @@ class DownloadService extends ChangeNotifier {
           size: size,
           ranges: ranges,
         );
+      }
+      if (code == 429 || code == 403) {
+        // Batas harian / pemblokiran sementara: coba proxy berikutnya.
+        if (ProxyService.instance.rotate()) {
+          _log('proxy', 'putar ke ${ProxyService.instance.current} (HTTP $code)');
+          return _probeWithNetwork(url, headers);
+        }
+        return ProbeResult.fail(code == 429 ? 'rate_limited' : 'HTTP $code');
       }
       if (code == 400 || code == 403 || code == 405 || code == 501) {
         // Sebagian server menolak HEAD atau request tanpa header browser;

@@ -8,6 +8,7 @@ import '../l10n/locale_controller.dart';
 import '../services/app_settings.dart';
 import '../services/cache_cleaner.dart';
 import '../services/native_downloads.dart';
+import '../services/proxy_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/theme_controller.dart';
 import '../utils/file_types.dart';
@@ -31,6 +32,68 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.initState();
     _checkAccess();
     _loadVersion();
+  }
+
+  Future<void> _showProxy() async {
+    final controller = TextEditingController(
+      text: ProxyService.instance.proxies.join('\n'),
+    );
+    var enabled = ProxyService.instance.enabled;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: const Text('Proxy unduhan'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Satu proxy per baris: host:port. Kalau server membalas 429 '
+                  'atau 403, aplikasi pindah ke proxy berikutnya lalu mencoba '
+                  'lagi. 404 tidak diputar (berkasnya memang tidak ada).',
+                  style: TextStyle(fontSize: 12),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: controller,
+                  maxLines: 5,
+                  decoration: const InputDecoration(
+                    hintText: '127.0.0.1:8080\n10.0.0.2:3128',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SwitchListTile(
+                  value: enabled,
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Pakai proxy'),
+                  onChanged: (v) => setLocal(() => enabled = v),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Batal'),
+            ),
+            TextButton(
+              onPressed: () async {
+                await ProxyService.instance.setList(controller.text);
+                await ProxyService.instance.setEnabled(enabled);
+                if (ctx.mounted) Navigator.of(ctx).pop();
+                if (mounted) setState(() {});
+              },
+              child: const Text('Simpan'),
+            ),
+          ],
+        ),
+      ),
+    );
+    controller.dispose();
   }
 
   Future<void> _showLogs() async {
@@ -99,8 +162,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _Header(title: s.settings),
               Expanded(
                 child: ListenableBuilder(
-                  listenable: Listenable.merge(
-                      [theme, locale, settings, DownloadHistory.instance]),
+                  listenable: Listenable.merge([
+                    theme,
+                    locale,
+                    settings,
+                    DownloadHistory.instance,
+                    ProxyService.instance,
+                  ]),
                   builder: (context, _) {
                     final scheme = AppColors.scheme;
                     return ListView(
@@ -382,6 +450,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 title: s.appName,
                                 subtitle: '${s.version} '
                                     '${_version.isEmpty ? '…' : _version}',
+                              ),
+                              _SettingRow(
+                                icon: Icons.vpn_lock_rounded,
+                                title: 'Proxy',
+                                subtitle: ProxyService.instance.enabled
+                                    ? 'Aktif · ${ProxyService.instance.proxies.length} proxy'
+                                    : 'Nonaktif',
+                                onTap: _showProxy,
+                                trailing: const _Chevron(),
                               ),
                               _SettingRow(
                                 icon: Icons.bug_report_outlined,
