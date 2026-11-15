@@ -112,11 +112,40 @@ class _GofileBrowser extends StatefulWidget {
 
 class _GofileBrowserState extends State<_GofileBrowser> {
   late final DownloadService _downloads = DownloadService(PixeldrainApi());
+  final _link = TextEditingController();
 
   @override
   void dispose() {
     _downloads.dispose();
+    _link.dispose();
     super.dispose();
+  }
+
+  Widget _linkBar(BuildContext context, GofileController ctrl) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 2, 20, 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _link,
+              textInputAction: TextInputAction.go,
+              onSubmitted: (v) => ctrl.openShare(v),
+              decoration: const InputDecoration(
+                isDense: true,
+                hintText: 'gofile.io/d/…',
+                prefixIcon: Icon(Icons.link_rounded, size: 20),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          IconButton.filledTonal(
+            onPressed: () => ctrl.openShare(_link.text),
+            icon: const Icon(Icons.arrow_forward_rounded),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _download(GofileEntry entry) async {
@@ -200,12 +229,38 @@ class _GofileBrowserState extends State<_GofileBrowser> {
           return const Center(child: CircularProgressIndicator());
         }
 
-        final entries = ctrl.entries;
+        final entries = ctrl.showingShare ? ctrl.shareEntries : ctrl.entries;
+        final title = ctrl.showingShare ? (ctrl.shareName ?? 'Gofile') : null;
         return RefreshIndicator(
           onRefresh: ctrl.refresh,
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 140),
+            padding: const EdgeInsets.fromLTRB(0, 4, 0, 140),
             children: [
+              _linkBar(context, ctrl),
+              if (title != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(22, 4, 22, 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: scheme.onSurface,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: ctrl.closeShare,
+                        child: Text(s.retry),
+                      ),
+                    ],
+                  ),
+                ),
               if (ctrl.error != null)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 10),
@@ -217,7 +272,9 @@ class _GofileBrowserState extends State<_GofileBrowser> {
                   ),
                 ),
               if (entries.isEmpty)
-                DashedPanel(
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: DashedPanel(
                   padding: const EdgeInsets.symmetric(vertical: 26),
                   child: Column(
                     children: [
@@ -232,13 +289,14 @@ class _GofileBrowserState extends State<_GofileBrowser> {
                       ),
                     ],
                   ),
+                  ),
                 )
               else
                 for (var i = 0; i < entries.length; i++)
                   Stagger(
                     index: i,
                     child: Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
                       child: Surface(
                         radius: AppRadii.lg,
                         padding: const EdgeInsets.symmetric(

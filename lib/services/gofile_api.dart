@@ -83,6 +83,22 @@ class GofileApi {
     return null;
   }
 
+  /// Buka folder/link share tanpa akun (gofile.io/d/xxxx).
+  Future<GofileFolder> folder(String id, {String? token}) async {
+    final entries = await list(id, token ?? '');
+    return GofileFolder(name: id, entries: entries);
+  }
+
+  /// Ambil id dari tautan share (gofile.io/d/ID) atau id mentah.
+  static String? shareIdFromInput(String input) {
+    final text = input.trim();
+    if (text.isEmpty) return null;
+    final match = RegExp(r'gofile\.io/(?:d|folder)/([A-Za-z0-9]+)').firstMatch(text);
+    if (match != null) return match.group(1);
+    if (RegExp(r'^[A-Za-z0-9]{5,}$').hasMatch(text)) return text;
+    return null;
+  }
+
   /// Daftar isi folder (root memakai `rootFolder` dari akun).
   Future<List<GofileEntry>> list(
     String folderId,
@@ -230,4 +246,11 @@ class GofileEntry {
       link: json['link']?.toString(),
     );
   }
+}
+
+class GofileFolder {
+  const GofileFolder({required this.name, required this.entries});
+
+  final String name;
+  final List<GofileEntry> entries;
 }

@@ -14,6 +14,9 @@ class GofileController extends ChangeNotifier {
   String? _token;
   GofileAccount? _account;
   List<GofileEntry> _entries = const [];
+  List<GofileEntry>? _shareEntries;
+  String? _shareName;
+  String? _shareId;
   bool _loading = false;
   bool _linkSent = false;
   String? _error;
@@ -21,6 +24,9 @@ class GofileController extends ChangeNotifier {
   String? get token => _token;
   GofileAccount? get account => _account;
   List<GofileEntry> get entries => _entries;
+  List<GofileEntry> get shareEntries => _shareEntries ?? const [];
+  String? get shareName => _shareName;
+  bool get showingShare => _shareEntries != null;
   bool get loading => _loading;
   bool get linkSent => _linkSent;
   String? get error => _error;
@@ -111,6 +117,42 @@ class GofileController extends ChangeNotifier {
       _error = e is GofileException ? e.code : 'koneksi';
     }
   }
+
+  /// Buka link share Gofile (tanpa perlu akun).
+  Future<bool> openShare(String input) async {
+    final id = GofileApi.shareIdFromInput(input);
+    if (id == null) {
+      _error = 'link_tidak_valid';
+      notifyListeners();
+      return false;
+    }
+    _loading = true;
+    _error = null;
+    notifyListeners();
+    try {
+      final folder = await api.folder(id, token: _token);
+      _shareId = id;
+      _shareName = folder.name;
+      _shareEntries = folder.entries;
+      return true;
+    } catch (e) {
+      _error = e is GofileException ? e.code : 'koneksi';
+      _shareEntries = null;
+      return false;
+    } finally {
+      _loading = false;
+      notifyListeners();
+    }
+  }
+
+  void closeShare() {
+    _shareEntries = null;
+    _shareName = null;
+    _shareId = null;
+    notifyListeners();
+  }
+
+  String? get shareId => _shareId;
 
   Future<void> logout() async {
     _token = null;

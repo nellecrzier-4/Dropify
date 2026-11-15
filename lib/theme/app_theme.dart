@@ -237,7 +237,9 @@ class AppMotion {
 
 ThemeData buildTheme([AppAppearance? appearance]) {
   if (appearance != null) {
-    AppColors.apply(appearance: appearance);
+    // Pertahankan seed yang sedang aktif (mis. warna sistem); jangan reset ke
+    // default setiap rebuild.
+    AppColors.apply(seedColor: AppColors.seed, appearance: appearance);
   }
   final scheme = AppColors.scheme;
   final dark = AppColors.isDark;
