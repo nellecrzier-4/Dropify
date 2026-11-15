@@ -262,6 +262,16 @@ class NativeDownloads {
     }
   }
 
+  /// Isi ekor dropify.log + crash.log (untuk layar diagnosa).
+  static Future<String> readLogs() async {
+    try {
+      final res = await _channel.invokeMethod<Object?>('readLogs');
+      return res?.toString() ?? '';
+    } catch (_) {
+      return '';
+    }
+  }
+
   /// Versi aplikasi yang benar-benar terpasang, mis. "1.7.10 (26)".
   static Future<String> appVersion() async {
     try {

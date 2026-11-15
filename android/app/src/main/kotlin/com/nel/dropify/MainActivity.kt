@@ -33,6 +33,37 @@ import java.io.File
  */
 class MainActivity : FlutterActivity() {
 
+    /**
+     * Simpan stack trace ke Download/Dropify/crash.log sebelum proses mati.
+     * Tanpa ini, crash native/Java hanya muncul di logcat yang tidak bisa
+     * dibaca pengguna dari dalam aplikasi.
+     */
+    private fun installCrashLogger() {
+        val previous = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, error ->
+            try {
+                val dir = File(
+                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+                    "Dropify",
+                ).apply { mkdirs() }
+                val file = File(dir, "crash.log")
+                val stamp = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
+                    .format(java.util.Date())
+                file.appendText(
+                    "\n===== $stamp (${thread.name}) =====\n" +
+                        android.util.Log.getStackTraceString(error),
+                )
+            } catch (_: Throwable) {
+            }
+            previous?.uncaughtException(thread, error)
+        }
+    }
+
+    override fun onCreate(savedInstanceState: android.os.Bundle?) {
+        installCrashLogger()
+        super.onCreate(savedInstanceState)
+    }
+
     private val channelName = "com.nel.dropify/native"
     private var nativeChannel: MethodChannel? = null
     private var pendingPermission: MethodChannel.Result? = null
@@ -310,6 +341,7 @@ class MainActivity : FlutterActivity() {
                             result.success(true)
                         }
                         "freeSpace" -> result.success(freeSpace())
+                        "readLogs" -> result.success(readLogs())
                         "downloadStart" -> {
                             val id = call.argument<String>("id") ?: ""
                             val url = call.argument<String>("url") ?: ""
@@ -353,6 +385,25 @@ class MainActivity : FlutterActivity() {
                     result.error("native_error", e.message ?: e.toString(), null)
                 }
             }
+    }
+
+    /** Gabungan ekor dropify.log dan crash.log untuk layar diagnosa. */
+    private fun readLogs(): String {
+        val dir = File(
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+            "Dropify",
+        )
+        fun tail(file: File, lines: Int): String {
+            if (!file.exists()) return "(belum ada)"
+            return try {
+                val all = file.readLines()
+                all.takeLast(lines).joinToString("\n")
+            } catch (e: Exception) {
+                "(tidak terbaca: ${e.message})"
+            }
+        }
+        return "== dropify.log ==\n${tail(File(dir, "dropify.log"), 120)}\n\n" +
+            "== crash.log ==\n${tail(File(dir, "crash.log"), 80)}"
     }
 
     /** Versi APK yang benar-benar terpasang, mis. "1.7.10 (26)". */

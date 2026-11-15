@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../l10n/app_strings.dart';
 import '../l10n/locale_controller.dart';
@@ -30,6 +31,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.initState();
     _checkAccess();
     _loadVersion();
+  }
+
+  Future<void> _showLogs() async {
+    final logs = await NativeDownloads.readLogs();
+    if (!mounted) return;
+    final text = logs.isEmpty ? '(log kosong)' : logs;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Log aplikasi'),
+        content: SizedBox(
+          width: double.maxFinite,
+          height: 360,
+          child: SingleChildScrollView(
+            child: SelectableText(
+              text,
+              style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: text));
+              if (ctx.mounted) Navigator.of(ctx).pop();
+            },
+            child: const Text('Salin'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Tutup'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _loadVersion() async {
@@ -346,6 +382,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 title: s.appName,
                                 subtitle: '${s.version} '
                                     '${_version.isEmpty ? '…' : _version}',
+                              ),
+                              _SettingRow(
+                                icon: Icons.bug_report_outlined,
+                                title: 'Log aplikasi',
+                                subtitle: 'dropify.log + crash.log',
+                                onTap: _showLogs,
+                                trailing: const _Chevron(),
                               ),
                             ],
                           ),
