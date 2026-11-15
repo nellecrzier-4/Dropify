@@ -193,7 +193,9 @@ class DownloadService extends ChangeNotifier {
     String? folderOverride,
     int parallelMinSize = 16 * 1024 * 1024,
     int minSegmentSize = 4 * 1024 * 1024,
+    bool useSystemDownloader = true,
   })  : _probeOverride = probe,
+        _useSystemDownloader = useSystemDownloader,
         _folderOverride = folderOverride,
         _parallelMinSize = parallelMinSize,
         _minSegmentSize = minSegmentSize,
@@ -209,6 +211,11 @@ class DownloadService extends ChangeNotifier {
 
   final PixeldrainApi api;
   final ProbeFn? _probeOverride;
+
+  /// Unduhan dari URL luar (Gofile/WebView) diserahkan ke DownloadManager
+  /// Android: berjalan di luar proses aplikasi, tahan aplikasi ditutup, dan
+  /// tidak menulis ulang berkas besar lewat lapisan FUSE.
+  final bool _useSystemDownloader;
   final String? _folderOverride;
   final Dio _dio;
 
@@ -272,8 +279,120 @@ class DownloadService extends ChangeNotifier {
       return task;
     }
 
+    if (urlOverride != null && _useSystemDownloader) {
+      final handled = await _runSystemDownload(task, urlOverride, headers);
+      if (handled) return task;
+      _log('native', '${task.name}: DownloadManager tidak tersedia, pakai downloader app');
+    }
+
     await _resolveAndRun(task);
     return task;
+  }
+
+  /// Serahkan unduhan ke DownloadManager Android lalu pantau progresnya.
+  ///
+  /// Mengembalikan false hanya kalau enqueue gagal total (mis. kanal native
+  /// tidak ada), supaya pemanggil bisa memakai downloader di dalam app.
+  Future<bool> _runSystemDownload(
+    DownloadTask task,
+    String url,
+    Map<String, String> headers,
+  ) async {
+    NativeDownloadHandle handle;
+    try {
+      handle = await NativeDownloads.enqueue(
+        url: url,
+        name: task.name,
+        headers: headers,
+      );
+    } catch (e) {
+      _log('native', '${task.name}: enqueue gagal ($e)');
+      return false;
+    }
+
+    task
+      ..status = DownloadStatus.downloading
+      ..path = handle.path
+      ..startedAt = DateTime.now()
+      ..url = url;
+    _log('native', '${task.name}: DownloadManager #${handle.id}');
+    _notifyUi();
+
+    var lastReceived = 0;
+    var lastTime = DateTime.now();
+    var missing = 0;
+
+    while (!_disposed) {
+      if (task.canceled) {
+        await NativeDownloads.cancel(handle.id);
+        return true;
+      }
+      await Future<void>.delayed(const Duration(seconds: 1));
+      final state = await NativeDownloads.query(handle.id);
+      if (state == null) {
+        // Kanal tidak menjawab: hentikan pemantauan, jangan menggandakan unduhan.
+        if (++missing >= 3) {
+          task
+            ..status = DownloadStatus.error
+            ..error = _s.downloaderUnavailable
+            ..endedAt = DateTime.now();
+          _notifyUi();
+          return true;
+        }
+        continue;
+      }
+      missing = 0;
+
+      if (state.total > 0) task.size = state.total;
+      task.received = state.received;
+      final now = DateTime.now();
+      final seconds = now.difference(lastTime).inSeconds;
+      if (seconds >= 1) {
+        final delta = state.received - lastReceived;
+        task.speed = delta <= 0 ? 0 : delta / seconds;
+        lastReceived = state.received;
+        lastTime = now;
+      }
+      _notifyUi();
+
+      if (state.isDone) {
+        task
+          ..status = DownloadStatus.done
+          ..received = task.size > 0 ? task.size : state.received
+          ..speed = 0
+          ..endedAt = DateTime.now();
+        _log('native', '${task.name}: selesai ${task.received} byte');
+        DownloadHistory.instance.add(
+          DownloadRecord(
+            name: task.name,
+            path: task.path ?? '',
+            size: task.received,
+            time: DateTime.now(),
+          ),
+        );
+        _notifyUi();
+        return true;
+      }
+      if (state.isFailed) {
+        task
+          ..status = DownloadStatus.error
+          ..error = state.error ?? _s.downloadFailed
+          ..speed = 0
+          ..endedAt = DateTime.now();
+        _log('native', '${task.name}: gagal ${task.error}');
+        _notifyUi();
+        return true;
+      }
+      _notifyUi();
+    }
+    return true;
+  }
+
+  /// Perbarui UI saja. DownloadManager punya notifikasi sendiri, jadi
+  /// foreground service aplikasi tidak perlu dinyalakan lagi.
+  void _notifyUi() {
+    if (_disposed) return;
+    notifyListeners();
   }
 
   Future<void> retry(String taskId) async {

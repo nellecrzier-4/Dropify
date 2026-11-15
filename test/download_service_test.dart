@@ -72,11 +72,15 @@ void main() {
 
   late List<Map<Object?, Object?>> notifications;
   late bool storageGranted;
+  Map<Object?, Object?>? systemEnqueueReply;
+  Map<Object?, Object?>? systemQueryReply;
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
     notifications = [];
     storageGranted = true;
+    systemEnqueueReply = null;
+    systemQueryReply = null;
 
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(_channel, (call) async {
@@ -89,6 +93,12 @@ void main() {
           notifications.add(call.arguments as Map<Object?, Object?>);
           return true;
         case 'cancelNotification':
+          return true;
+        case 'enqueue':
+          return systemEnqueueReply;
+        case 'query':
+          return systemQueryReply;
+        case 'cancel':
           return true;
         default:
           return null;
@@ -278,6 +288,31 @@ void main() {
     expect(b.status, DownloadStatus.done, reason: b.error ?? '');
     expect(File(a.path!).parent.path, dir.path);
     expect(File(b.path!).parent.path, dir.path);
+
+    service.dispose();
+    await dir.delete(recursive: true);
+  });
+
+  test('URL luar diserahkan ke DownloadManager bila tersedia', () async {
+    final dir = await Directory.systemTemp.createTemp('dropify_dl');
+    final adapter = _FakeAdapter(total: 64 * 1024);
+    final service = await makeService(adapter, dir);
+
+    systemEnqueueReply = {
+      'id': 77,
+      'name': 'goweb.bin',
+      'path': '/storage/emulated/0/Download/Dropify/goweb.bin',
+    };
+    systemQueryReply = {'state': 'done', 'received': 4096, 'total': 4096};
+
+    final task = await service.download(
+      const PdItem(name: 'goweb.bin', size: 0),
+      urlOverride: 'https://store-eu-par-1.gofile.io/download/web/a/goweb.bin',
+    );
+
+    expect(task!.status, DownloadStatus.done, reason: task.error ?? '');
+    expect(task.path, '/storage/emulated/0/Download/Dropify/goweb.bin');
+    expect(adapter.calls, 0, reason: 'tidak boleh memakai downloader Dart');
 
     service.dispose();
     await dir.delete(recursive: true);
