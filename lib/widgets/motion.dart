@@ -1,3 +1,4 @@
+import 'dart:ui' show ImageFilter;
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -412,3 +413,83 @@ BorderRadius squircle(double radius) => BorderRadius.only(
 
 /// Jarak horisontal antar halaman, dipakai tab bar.
 double tabOffset(int from, int to) => (to - from).toDouble() * math.pi;
+
+/// Dialog bergaya "popup" Material Expressive: latar diblur, kartu masuk dengan
+/// skala pegas + fade (bukan fade datar seperti dialog bawaan).
+Future<T?> showExpressiveDialog<T>({
+  required BuildContext context,
+  required WidgetBuilder builder,
+  bool barrierDismissible = true,
+}) {
+  return showGeneralDialog<T>(
+    context: context,
+    barrierDismissible: barrierDismissible,
+    barrierLabel:
+        MaterialLocalizations.of(context).modalBarrierDismissLabel,
+    barrierColor: Colors.transparent,
+    transitionDuration: Motion.slow,
+    pageBuilder: (context, animation, secondaryAnimation) {
+      final fade = CurvedAnimation(parent: animation, curve: Curves.easeOut);
+      final scale = CurvedAnimation(
+        parent: animation,
+        curve: Motion.spring,
+        reverseCurve: Motion.standard,
+      );
+      return Stack(
+        children: [
+          Positioned.fill(
+            child: FadeTransition(
+              opacity: fade,
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                child: ColoredBox(
+                  color: Colors.black.withValues(alpha: 0.22),
+                ),
+              ),
+            ),
+          ),
+          Center(
+            child: ScaleTransition(
+              scale: Tween<double>(begin: 0.86, end: 1).animate(scale),
+              child: FadeTransition(opacity: fade, child: builder(context)),
+            ),
+          ),
+        ],
+      );
+    },
+    transitionBuilder: (context, animation, secondary, child) => child,
+  );
+}
+
+/// Bottom sheet dengan kurva pegas + latar diblur, meniru rasa popup iOS.
+Future<T?> showExpressiveSheet<T>({
+  required BuildContext context,
+  required WidgetBuilder builder,
+  bool isScrollControlled = true,
+  bool useSafeArea = true,
+}) {
+  return showModalBottomSheet<T>(
+    context: context,
+    isScrollControlled: isScrollControlled,
+    useSafeArea: useSafeArea,
+    backgroundColor: Colors.transparent,
+    barrierColor: Colors.black.withValues(alpha: 0.34),
+    sheetAnimationStyle: AnimationStyle(
+      duration: Motion.slow,
+      curve: Motion.spring,
+      reverseDuration: Motion.base,
+      reverseCurve: Motion.standard,
+    ),
+    builder: (sheetContext) => Padding(
+      padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+      child: Material(
+        color: Theme.of(sheetContext).colorScheme.surfaceContainerLow,
+        clipBehavior: Clip.antiAlias,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+        ),
+        child: builder(sheetContext),
+      ),
+    ),
+  );
+}

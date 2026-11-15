@@ -153,7 +153,7 @@ class _FolderViewState extends State<FolderView> {
   Future<String?> _askName({required String title, String initial = ''}) {
     final controller = TextEditingController(text: initial);
     final s = context.s;
-    return showDialog<String>(
+    return showExpressiveDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(title),
@@ -195,7 +195,7 @@ class _FolderViewState extends State<FolderView> {
     if (res == null || !mounted) return;
 
     setState(() => _uploading = true);
-    showDialog<void>(
+    showExpressiveDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (_) => AlertDialog(
@@ -234,7 +234,7 @@ class _FolderViewState extends State<FolderView> {
 
   Future<void> _folderActions(PdItem item) async {
     final s = context.s;
-    await showModalBottomSheet<void>(
+    await showExpressiveSheet<void>(
       context: context,
       builder: (sheetContext) => _FolderSheet(
         item: item,
@@ -252,7 +252,7 @@ class _FolderViewState extends State<FolderView> {
         },
         onDelete: () async {
           Navigator.pop(sheetContext);
-          final ok = await showDialog<bool>(
+          final ok = await showExpressiveDialog<bool>(
             context: context,
             builder: (d) => AlertDialog(
               title: Text(s.deleteFolderTitle),

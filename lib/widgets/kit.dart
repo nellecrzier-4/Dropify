@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../theme/app_theme.dart';
 import 'motion.dart';
@@ -765,6 +766,8 @@ class GlassNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = AppColors.scheme;
+    const barHeight = 56.0;
+    const pad = 8.0;
 
     return Container(
       decoration: BoxDecoration(
@@ -776,31 +779,67 @@ class GlassNav extends StatelessWidget {
         child: BackdropFilter(
           filter: ui.ImageFilter.blur(sigmaX: 30, sigmaY: 30),
           child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+            padding: const EdgeInsets.all(pad),
             decoration: BoxDecoration(
               color: scheme.surfaceContainerHigh.withValues(
-                alpha: AppColors.isDark ? 0.82 : 0.88,
+                alpha: AppColors.isDark ? 0.80 : 0.86,
               ),
               borderRadius: BorderRadius.circular(AppRadii.pill),
               border: Border.all(
-                color: scheme.outlineVariant.withValues(alpha: 0.6),
+                color: scheme.outlineVariant.withValues(alpha: 0.5),
                 width: 0.6,
               ),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                for (var i = 0; i < items.length; i++)
-                  _NavItem(
-                    item: items[i],
-                    selected: i == index,
-                    onTap: () => onTap(i),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final trailingWidth = trailing == null ? 0.0 : 56.0;
+                final usable = constraints.maxWidth - trailingWidth;
+                final segment = usable / items.length;
+
+                return SizedBox(
+                  height: barHeight,
+                  child: Stack(
+                    children: [
+                      // Indikator seleksi: lebar TETAP per segmen, hanya
+                      // digeser — jadi bar tidak pernah berubah ukuran /
+                      // bergoyang saat pindah tab.
+                      AnimatedPositioned(
+                        duration: Motion.slow,
+                        curve: Motion.spring,
+                        left: segment * index + 2,
+                        top: 0,
+                        bottom: 0,
+                        width: segment - 4,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: scheme.secondaryContainer,
+                            borderRadius:
+                                BorderRadius.circular(AppRadii.pill),
+                          ),
+                        ),
+                      ),
+                      Row(
+                        children: [
+                          for (var i = 0; i < items.length; i++)
+                            SizedBox(
+                              width: segment,
+                              child: _NavItem(
+                                item: items[i],
+                                selected: i == index,
+                                onTap: () => onTap(i),
+                              ),
+                            ),
+                          if (trailing != null)
+                            SizedBox(
+                              width: trailingWidth,
+                              child: Center(child: trailing),
+                            ),
+                        ],
+                      ),
+                    ],
                   ),
-                if (trailing != null) ...[
-                  const SizedBox(width: 4),
-                  trailing!,
-                ],
-              ],
+                );
+              },
             ),
           ),
         ),
@@ -824,47 +863,51 @@ class _NavItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = AppColors.scheme;
 
-    return Pressable(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: Motion.slow,
-        curve: Motion.spring,
-        padding: EdgeInsets.symmetric(
-          horizontal: selected ? 16 : 14,
-          vertical: 10,
-        ),
-        decoration: BoxDecoration(
-          color: selected ? scheme.secondaryContainer : Colors.transparent,
-          borderRadius: BorderRadius.circular(AppRadii.pill),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              selected ? (item.activeIcon ?? item.icon) : item.icon,
-              size: 22,
-              color: selected
-                  ? scheme.onSecondaryContainer
-                  : scheme.onSurfaceVariant,
-            ),
-            AnimatedSize(
-              duration: Motion.slow,
-              curve: Motion.spring,
-              child: selected
-                  ? Padding(
-                      padding: const EdgeInsets.only(left: 8),
-                      child: Text(
-                        item.label,
-                        style: TextStyle(
-                          color: scheme.onSecondaryContainer,
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w600,
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        HapticFeedback.selectionClick();
+        onTap();
+      },
+      child: Center(
+        child: ClipRect(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AnimatedScale(
+                scale: selected ? 1 : 0.94,
+                duration: Motion.base,
+                curve: Motion.spring,
+                child: Icon(
+                  selected ? (item.activeIcon ?? item.icon) : item.icon,
+                  size: 22,
+                  color: selected
+                      ? scheme.onSecondaryContainer
+                      : scheme.onSurfaceVariant,
+                ),
+              ),
+              AnimatedSize(
+                duration: Motion.slow,
+                curve: Motion.spring,
+                alignment: Alignment.centerLeft,
+                child: selected
+                    ? Padding(
+                        padding: const EdgeInsets.only(left: 8),
+                        child: Text(
+                          item.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: scheme.onSecondaryContainer,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                      ),
-                    )
-                  : const SizedBox(width: 0, height: 0),
-            ),
-          ],
+                      )
+                    : const SizedBox(width: 0, height: 0),
+              ),
+            ],
+          ),
         ),
       ),
     );

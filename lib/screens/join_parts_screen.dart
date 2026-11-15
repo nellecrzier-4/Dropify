@@ -90,7 +90,7 @@ class _JoinPartsScreenState extends State<JoinPartsScreen> {
     setState(() => _busy = true);
     try {
       if (await output.exists()) {
-        final overwrite = await showDialog<bool>(
+        final overwrite = await showExpressiveDialog<bool>(
           context: context,
           builder: (d) => AlertDialog(
             title: Text(s.joinOverwriteTitle),

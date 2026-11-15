@@ -16,7 +16,7 @@ Future<void> showLinkDownloadSheet(
   DriveController ctrl, {
   String? initialLink,
 }) async {
-  await showModalBottomSheet<void>(
+  await showExpressiveSheet<void>(
     context: context,
     isScrollControlled: true,
     builder: (_) => Padding(

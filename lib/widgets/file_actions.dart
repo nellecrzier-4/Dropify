@@ -112,7 +112,7 @@ void showItemActions(BuildContext context, DriveController ctrl, PdItem item) {
     );
   }
 
-  showModalBottomSheet<void>(
+  showExpressiveSheet<void>(
     context: context,
     isScrollControlled: true,
     builder: (sheetContext) => _ItemSheet(
@@ -183,7 +183,7 @@ void showItemActions(BuildContext context, DriveController ctrl, PdItem item) {
                 }
                 return;
               }
-              final ok = await showDialog<bool>(
+              final ok = await showExpressiveDialog<bool>(
                 context: context,
                 builder: (d) => AlertDialog(
                   title: Text(s.deleteFileTitle),

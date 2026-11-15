@@ -19,7 +19,7 @@ void showTransfers(
   DriveController ctrl, {
   int initialTab = 0,
 }) {
-  showModalBottomSheet(
+  showExpressiveSheet(
     context: context,
     isScrollControlled: true,
     builder: (_) => DefaultTabController(
@@ -326,7 +326,7 @@ class _DownloadsTab extends StatelessWidget {
   Future<void> _showDetails(BuildContext context, DownloadTask task) async {
     final s = context.s;
     final controller = ctrl;
-    await showModalBottomSheet<void>(
+    await showExpressiveSheet<void>(
       context: context,
       builder: (sheetContext) => SafeArea(
         top: false,

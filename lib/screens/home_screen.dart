@@ -76,7 +76,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _showAddMenu() async {
     final s = context.s;
-    await showModalBottomSheet<void>(
+    await showExpressiveSheet<void>(
       context: context,
       isScrollControlled: true,
       builder: (sheetContext) => _AddMenuSheet(

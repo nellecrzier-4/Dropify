@@ -1,7 +1,7 @@
 // Harness pratinjau: merender layar jadi PNG supaya perubahan visual bisa
 // diperiksa tanpa perangkat. Jalankan:
-//   flutter test test/preview_test.dart --update-goldens
-// Hasilnya ada di test/goldens/.
+//   PREVIEW=1 flutter test test/preview_test.dart --update-goldens
+// Hasilnya ada di test/goldens/ (tidak disimpan di repo).
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -80,14 +80,11 @@ Widget _app(Widget home, AppAppearance appearance) {
         textStyle: btn(base.outlinedButtonTheme.style?.textStyle?.resolve({})),
       ),
     ),
-    // Pastikan font Roboto asli dipakai, bukan font kotak milik test runner.
     textTheme: base.textTheme.apply(fontFamily: 'Roboto'),
   );
   return MaterialApp(
     debugShowCheckedModeBanner: false,
-    theme: theme.copyWith(
-      primaryTextTheme: theme.primaryTextTheme.apply(fontFamily: 'Roboto'),
-    ),
+    theme: theme,
     home: home,
   );
 }
@@ -119,7 +116,6 @@ Future<void> _shoot(
   );
   debugDisableShadows = true;
 }
-
 
 DriveController _fakeController() {
   final ctrl = DriveController(PixeldrainApi());
@@ -161,9 +157,44 @@ DriveController _fakeController() {
   return ctrl;
 }
 
+Widget _shell(Widget child, {Widget? nav}) => Scaffold(
+      body: Stack(
+        children: [
+          Positioned.fill(child: OrbBackground(child: child)),
+          if (nav != null)
+            Positioned(left: 0, right: 0, bottom: 0, child: nav!),
+        ],
+      ),
+    );
 
-/// Demo material: kartu-kartu sengaja diposisikan di belakang nav pill supaya
-/// efek blur-nya bisa dinilai dari satu gambar.
+Widget _tabPreview() {
+  final ctrl = _fakeController();
+  return _shell(
+    HomeTab(ctrl: ctrl, onLogout: () {}),
+    nav: Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+      child: SafeArea(
+        top: false,
+        child: GlassNav(
+          items: const [
+            GlassNavItem(icon: Icons.home_outlined, label: 'Home'),
+            GlassNavItem(icon: Icons.folder_open_outlined, label: 'Files'),
+            GlassNavItem(icon: Icons.photo_library_outlined, label: 'Photos'),
+          ],
+          index: 0,
+          onTap: (_) {},
+        ),
+      ),
+    ),
+  );
+}
+
+Widget _filesPreview() {
+  final ctrl = _fakeController();
+  return _shell(FilesTab(ctrl: ctrl));
+}
+
+/// Demo material: kartu sengaja di belakang nav pill untuk menilai blur.
 Widget _navMaterial() {
   final cards = <Widget>[
     for (var i = 0; i < 14; i++)
@@ -237,45 +268,7 @@ Widget _navMaterial() {
   );
 }
 
-Widget _shell(Widget child, {Widget? nav}) => Scaffold(
-      body: Stack(
-        children: [
-          Positioned.fill(child: OrbBackground(child: child)),
-          if (nav != null)
-            Positioned(left: 0, right: 0, bottom: 0, child: nav!),
-        ],
-      ),
-    );
-
-Widget _tabPreview() {
-  final ctrl = _fakeController();
-  return _shell(
-    HomeTab(ctrl: ctrl, onLogout: () {}),
-    nav: Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-      child: SafeArea(
-        top: false,
-        child: GlassNav(
-          items: const [
-            GlassNavItem(icon: Icons.home_outlined, label: 'Home'),
-            GlassNavItem(icon: Icons.folder_open_outlined, label: 'Files'),
-            GlassNavItem(icon: Icons.photo_library_outlined, label: 'Photos'),
-          ],
-          index: 0,
-          onTap: (_) {},
-        ),
-      ),
-    ),
-  );
-}
-
-Widget _filesPreview() {
-  final ctrl = _fakeController();
-  return _shell(FilesTab(ctrl: ctrl));
-}
-
-// Hanya jalan kalau diminta: PREVIEW=1 flutter test test/preview_test.dart --update-goldens
-// (golden tidak disimpan di repo, jadi default `flutter test` tetap hijau).
+// Hanya jalan kalau diminta: PREVIEW=1 flutter test … --update-goldens
 bool get _enabled => Platform.environment['PREVIEW'] == '1';
 
 void main() {
@@ -296,16 +289,16 @@ void main() {
     });
 
     testWidgets('setup $tag', skip: !_enabled, (tester) async {
-      await _shoot(
-        tester,
-        'setup_$tag',
-        SetupScreen(onDone: () {}),
-        appearance,
-      );
+      await _shoot(tester, 'setup_$tag', SetupScreen(onDone: () {}), appearance);
     });
 
     testWidgets('home $tag', skip: !_enabled, (tester) async {
-      await _shoot(tester, 'home_$tag', HomeScreen(api: PixeldrainApi()), appearance);
+      await _shoot(
+        tester,
+        'home_$tag',
+        HomeScreen(api: PixeldrainApi()),
+        appearance,
+      );
     });
 
     testWidgets('home tab $tag', skip: !_enabled, (tester) async {
