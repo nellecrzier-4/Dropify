@@ -1,0 +1,79 @@
+From 06172467c1722a692f4beb42cbe7daa835a1c65f Mon Sep 17 00:00:00 2001
+From: design-bot <design@local>
+Date: Sun, 15 Nov 2026 08:37:16 +0000
+Subject: [PATCH] =?UTF-8?q?release:=20v1.7.1=20(versionCode=2017)=20?=
+ =?UTF-8?q?=E2=80=94=20Gofile=20WebView=20pakai=20akun?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ lib/screens/files_tab.dart         |  2 +-
+ lib/screens/gofile_web_screen.dart | 14 ++++++++++++--
+ pubspec.yaml                       |  2 +-
+ 3 files changed, 14 insertions(+), 4 deletions(-)
+
+diff --git a/lib/screens/files_tab.dart b/lib/screens/files_tab.dart
+index 927da1e..061169a 100644
+--- a/lib/screens/files_tab.dart
++++ b/lib/screens/files_tab.dart
+@@ -125,7 +125,7 @@ class _GofileBrowserState extends State<_GofileBrowser> {
+   void _openWeb(BuildContext context, [String? url]) {
+     Navigator.of(context).push(
+       SharedAxisPageRoute<void>(
+-        builder: (_) => GofileWebScreen(url: url),
++        builder: (_) => GofileWebScreen(url: url, token: widget.ctrl.token),
+       ),
+     );
+   }
+diff --git a/lib/screens/gofile_web_screen.dart b/lib/screens/gofile_web_screen.dart
+index 15b060d..570988a 100644
+--- a/lib/screens/gofile_web_screen.dart
++++ b/lib/screens/gofile_web_screen.dart
+@@ -8,10 +8,14 @@ import '../widgets/motion.dart';
+ /// Gofile di dalam aplikasi: memakai sesi web resmi mereka, tapi tampilan
+ /// diselaraskan dengan tema aplikasi (warna, radius, header sendiri).
+ class GofileWebScreen extends StatefulWidget {
+-  const GofileWebScreen({super.key, this.url});
++  const GofileWebScreen({super.key, this.url, this.token});
+ 
+   final String? url;
+ 
++  /// Token akun Gofile dari app; dipakai untuk login di web supaya sesi yang
++  /// terbuka adalah akun pengguna, bukan akun guest.
++  final String? token;
++
+   @override
+   State<GofileWebScreen> createState() => _GofileWebScreenState();
+ }
+@@ -25,7 +29,13 @@ class _GofileWebScreenState extends State<GofileWebScreen> {
+         onPageFinished: (_) => _applyTheme(),
+       ),
+     )
+-    ..loadRequest(Uri.parse(widget.url ?? 'https://gofile.io/'));
++    ..loadRequest(
++      Uri.parse(
++        widget.token != null && widget.token!.isNotEmpty
++            ? 'https://gofile.io/login/${widget.token}'
++            : (widget.url ?? 'https://gofile.io/'),
++      ),
++    );
+ 
+   /// Selaraskan tampilan Gofile dengan tema aplikasi: warna permukaan, sudut
+   /// membulat, font, dan sembunyikan elemen navigasi mereka yang redundan.
+diff --git a/pubspec.yaml b/pubspec.yaml
+index bd6ccdc..aba9527 100644
+--- a/pubspec.yaml
++++ b/pubspec.yaml
+@@ -1,7 +1,7 @@
+ name: dropify
+ description: A Pixeldrain Client.
+ publish_to: 'none'
+-version: 1.7.0+16
++version: 1.7.1+17
+ 
+ environment:
+   sdk: '>=3.0.0 <4.0.0'
+-- 
+2.34.1
+

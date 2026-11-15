@@ -1,0 +1,268 @@
+From d4a0f0f1f16bfa6340ed04ed70cba2f2bd433a13 Mon Sep 17 00:00:00 2001
+From: design-bot <design@local>
+Date: Sun, 15 Nov 2026 07:58:18 +0000
+Subject: [PATCH] =?UTF-8?q?release:=20v1.6.1=20(versionCode=2013)=20?=
+ =?UTF-8?q?=E2=80=94=20dynamic=20color=20+=20Gofile=20share?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ lib/controllers/gofile_controller.dart | 42 ++++++++++++++++
+ lib/screens/files_tab.dart             | 66 ++++++++++++++++++++++++--
+ lib/services/gofile_api.dart           | 23 +++++++++
+ lib/theme/app_theme.dart               |  4 +-
+ pubspec.yaml                           |  2 +-
+ 5 files changed, 131 insertions(+), 6 deletions(-)
+
+diff --git a/lib/controllers/gofile_controller.dart b/lib/controllers/gofile_controller.dart
+index 39c5a53..80ec1b8 100644
+--- a/lib/controllers/gofile_controller.dart
++++ b/lib/controllers/gofile_controller.dart
+@@ -14,6 +14,9 @@ class GofileController extends ChangeNotifier {
+   String? _token;
+   GofileAccount? _account;
+   List<GofileEntry> _entries = const [];
++  List<GofileEntry>? _shareEntries;
++  String? _shareName;
++  String? _shareId;
+   bool _loading = false;
+   bool _linkSent = false;
+   String? _error;
+@@ -21,6 +24,9 @@ class GofileController extends ChangeNotifier {
+   String? get token => _token;
+   GofileAccount? get account => _account;
+   List<GofileEntry> get entries => _entries;
++  List<GofileEntry> get shareEntries => _shareEntries ?? const [];
++  String? get shareName => _shareName;
++  bool get showingShare => _shareEntries != null;
+   bool get loading => _loading;
+   bool get linkSent => _linkSent;
+   String? get error => _error;
+@@ -112,6 +118,42 @@ class GofileController extends ChangeNotifier {
+     }
+   }
+ 
++  /// Buka link share Gofile (tanpa perlu akun).
++  Future<bool> openShare(String input) async {
++    final id = GofileApi.shareIdFromInput(input);
++    if (id == null) {
++      _error = 'link_tidak_valid';
++      notifyListeners();
++      return false;
++    }
++    _loading = true;
++    _error = null;
++    notifyListeners();
++    try {
++      final folder = await api.folder(id, token: _token);
++      _shareId = id;
++      _shareName = folder.name;
++      _shareEntries = folder.entries;
++      return true;
++    } catch (e) {
++      _error = e is GofileException ? e.code : 'koneksi';
++      _shareEntries = null;
++      return false;
++    } finally {
++      _loading = false;
++      notifyListeners();
++    }
++  }
++
++  void closeShare() {
++    _shareEntries = null;
++    _shareName = null;
++    _shareId = null;
++    notifyListeners();
++  }
++
++  String? get shareId => _shareId;
++
+   Future<void> logout() async {
+     _token = null;
+     _account = null;
+diff --git a/lib/screens/files_tab.dart b/lib/screens/files_tab.dart
+index 70af907..e1ec18f 100644
+--- a/lib/screens/files_tab.dart
++++ b/lib/screens/files_tab.dart
+@@ -112,13 +112,42 @@ class _GofileBrowser extends StatefulWidget {
+ 
+ class _GofileBrowserState extends State<_GofileBrowser> {
+   late final DownloadService _downloads = DownloadService(PixeldrainApi());
++  final _link = TextEditingController();
+ 
+   @override
+   void dispose() {
+     _downloads.dispose();
++    _link.dispose();
+     super.dispose();
+   }
+ 
++  Widget _linkBar(BuildContext context, GofileController ctrl) {
++    return Padding(
++      padding: const EdgeInsets.fromLTRB(20, 2, 20, 8),
++      child: Row(
++        children: [
++          Expanded(
++            child: TextField(
++              controller: _link,
++              textInputAction: TextInputAction.go,
++              onSubmitted: (v) => ctrl.openShare(v),
++              decoration: const InputDecoration(
++                isDense: true,
++                hintText: 'gofile.io/d/…',
++                prefixIcon: Icon(Icons.link_rounded, size: 20),
++              ),
++            ),
++          ),
++          const SizedBox(width: 8),
++          IconButton.filledTonal(
++            onPressed: () => ctrl.openShare(_link.text),
++            icon: const Icon(Icons.arrow_forward_rounded),
++          ),
++        ],
++      ),
++    );
++  }
++
+   Future<void> _download(GofileEntry entry) async {
+     final link = entry.link;
+     if (link == null || link.isEmpty) return;
+@@ -200,12 +229,38 @@ class _GofileBrowserState extends State<_GofileBrowser> {
+           return const Center(child: CircularProgressIndicator());
+         }
+ 
+-        final entries = ctrl.entries;
++        final entries = ctrl.showingShare ? ctrl.shareEntries : ctrl.entries;
++        final title = ctrl.showingShare ? (ctrl.shareName ?? 'Gofile') : null;
+         return RefreshIndicator(
+           onRefresh: ctrl.refresh,
+           child: ListView(
+-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 140),
++            padding: const EdgeInsets.fromLTRB(0, 4, 0, 140),
+             children: [
++              _linkBar(context, ctrl),
++              if (title != null)
++                Padding(
++                  padding: const EdgeInsets.fromLTRB(22, 4, 22, 8),
++                  child: Row(
++                    children: [
++                      Expanded(
++                        child: Text(
++                          title,
++                          maxLines: 1,
++                          overflow: TextOverflow.ellipsis,
++                          style: TextStyle(
++                            color: scheme.onSurface,
++                            fontSize: 15,
++                            fontWeight: FontWeight.w600,
++                          ),
++                        ),
++                      ),
++                      TextButton(
++                        onPressed: ctrl.closeShare,
++                        child: Text(s.retry),
++                      ),
++                    ],
++                  ),
++                ),
+               if (ctrl.error != null)
+                 Padding(
+                   padding: const EdgeInsets.only(bottom: 10),
+@@ -217,7 +272,9 @@ class _GofileBrowserState extends State<_GofileBrowser> {
+                   ),
+                 ),
+               if (entries.isEmpty)
+-                DashedPanel(
++                Padding(
++                  padding: const EdgeInsets.symmetric(horizontal: 20),
++                  child: DashedPanel(
+                   padding: const EdgeInsets.symmetric(vertical: 26),
+                   child: Column(
+                     children: [
+@@ -232,13 +289,14 @@ class _GofileBrowserState extends State<_GofileBrowser> {
+                       ),
+                     ],
+                   ),
++                  ),
+                 )
+               else
+                 for (var i = 0; i < entries.length; i++)
+                   Stagger(
+                     index: i,
+                     child: Padding(
+-                      padding: const EdgeInsets.only(bottom: 8),
++                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                       child: Surface(
+                         radius: AppRadii.lg,
+                         padding: const EdgeInsets.symmetric(
+diff --git a/lib/services/gofile_api.dart b/lib/services/gofile_api.dart
+index 3aa5a67..6ade3fa 100644
+--- a/lib/services/gofile_api.dart
++++ b/lib/services/gofile_api.dart
+@@ -83,6 +83,22 @@ class GofileApi {
+     return null;
+   }
+ 
++  /// Buka folder/link share tanpa akun (gofile.io/d/xxxx).
++  Future<GofileFolder> folder(String id, {String? token}) async {
++    final entries = await list(id, token ?? '');
++    return GofileFolder(name: id, entries: entries);
++  }
++
++  /// Ambil id dari tautan share (gofile.io/d/ID) atau id mentah.
++  static String? shareIdFromInput(String input) {
++    final text = input.trim();
++    if (text.isEmpty) return null;
++    final match = RegExp(r'gofile\.io/(?:d|folder)/([A-Za-z0-9]+)').firstMatch(text);
++    if (match != null) return match.group(1);
++    if (RegExp(r'^[A-Za-z0-9]{5,}$').hasMatch(text)) return text;
++    return null;
++  }
++
+   /// Daftar isi folder (root memakai `rootFolder` dari akun).
+   Future<List<GofileEntry>> list(
+     String folderId,
+@@ -231,3 +247,10 @@ class GofileEntry {
+     );
+   }
+ }
++
++class GofileFolder {
++  const GofileFolder({required this.name, required this.entries});
++
++  final String name;
++  final List<GofileEntry> entries;
++}
+diff --git a/lib/theme/app_theme.dart b/lib/theme/app_theme.dart
+index 6137bc2..d3a0647 100644
+--- a/lib/theme/app_theme.dart
++++ b/lib/theme/app_theme.dart
+@@ -237,7 +237,9 @@ class AppMotion {
+ 
+ ThemeData buildTheme([AppAppearance? appearance]) {
+   if (appearance != null) {
+-    AppColors.apply(appearance: appearance);
++    // Pertahankan seed yang sedang aktif (mis. warna sistem); jangan reset ke
++    // default setiap rebuild.
++    AppColors.apply(seedColor: AppColors.seed, appearance: appearance);
+   }
+   final scheme = AppColors.scheme;
+   final dark = AppColors.isDark;
+diff --git a/pubspec.yaml b/pubspec.yaml
+index 35c9a0d..2b1d257 100644
+--- a/pubspec.yaml
++++ b/pubspec.yaml
+@@ -1,7 +1,7 @@
+ name: dropify
+ description: A Pixeldrain Client.
+ publish_to: 'none'
+-version: 1.6.0+12
++version: 1.6.1+13
+ 
+ environment:
+   sdk: '>=3.0.0 <4.0.0'
+-- 
+2.34.1
+

@@ -1,0 +1,76 @@
+From fc47cca8956d1477f719f205ef29332c4dda7b4b Mon Sep 17 00:00:00 2001
+From: design-bot <design@local>
+Date: Sun, 15 Nov 2026 08:05:46 +0000
+Subject: [PATCH] =?UTF-8?q?release:=20v1.6.2=20(versionCode=2014)=20?=
+ =?UTF-8?q?=E2=80=94=20Gofile=20children=20parsing?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ lib/screens/files_tab.dart   |  2 +-
+ lib/services/gofile_api.dart | 19 ++++++++++++-------
+ pubspec.yaml                 |  2 +-
+ 3 files changed, 14 insertions(+), 9 deletions(-)
+
+diff --git a/lib/screens/files_tab.dart b/lib/screens/files_tab.dart
+index e1ec18f..b6c988f 100644
+--- a/lib/screens/files_tab.dart
++++ b/lib/screens/files_tab.dart
+@@ -236,7 +236,7 @@ class _GofileBrowserState extends State<_GofileBrowser> {
+           child: ListView(
+             padding: const EdgeInsets.fromLTRB(0, 4, 0, 140),
+             children: [
+-              _linkBar(context, ctrl),
++              if (!ctrl.loggedIn || entries.isEmpty) _linkBar(context, ctrl),
+               if (title != null)
+                 Padding(
+                   padding: const EdgeInsets.fromLTRB(22, 4, 22, 8),
+diff --git a/lib/services/gofile_api.dart b/lib/services/gofile_api.dart
+index 6ade3fa..8995cce 100644
+--- a/lib/services/gofile_api.dart
++++ b/lib/services/gofile_api.dart
+@@ -122,15 +122,20 @@ class GofileApi {
+       );
+     }
+     final data = _data(res);
+-    final children = data['children'];
++    // `children` bisa berupa map (id -> entry) atau list, tergantung versi API.
++    final children = data['children'] ?? data['files'] ?? data['contents'];
+     final entries = <GofileEntry>[];
++    final raw = <dynamic>[];
+     if (children is Map) {
+-      for (final value in children.values) {
+-        if (value is Map<String, dynamic>) {
+-          entries.add(GofileEntry.fromJson(value));
+-        } else if (value is Map) {
+-          entries.add(GofileEntry.fromJson(Map<String, dynamic>.from(value)));
+-        }
++      raw.addAll(children.values);
++    } else if (children is List) {
++      raw.addAll(children);
++    }
++    for (final value in raw) {
++      if (value is Map<String, dynamic>) {
++        entries.add(GofileEntry.fromJson(value));
++      } else if (value is Map) {
++        entries.add(GofileEntry.fromJson(Map<String, dynamic>.from(value)));
+       }
+     }
+     entries.sort((a, b) {
+diff --git a/pubspec.yaml b/pubspec.yaml
+index 2b1d257..ce00d9d 100644
+--- a/pubspec.yaml
++++ b/pubspec.yaml
+@@ -1,7 +1,7 @@
+ name: dropify
+ description: A Pixeldrain Client.
+ publish_to: 'none'
+-version: 1.6.1+13
++version: 1.6.2+14
+ 
+ environment:
+   sdk: '>=3.0.0 <4.0.0'
+-- 
+2.34.1
+

@@ -1,0 +1,883 @@
+From 1c3b9b94bbaac3fea01351201a5e7a80580bc7dd Mon Sep 17 00:00:00 2001
+From: Dropify Bot <bot@dropify.local>
+Date: Sun, 15 Nov 2026 09:05:07 +0000
+Subject: [PATCH] =?UTF-8?q?release:=20v1.7.2=20(versionCode=2018)=20?=
+ =?UTF-8?q?=E2=80=94=20unduhan=20WebView=20Gofile=20masuk=20DownloadServic?=
+ =?UTF-8?q?e?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- gofile_web_screen: tangkap awal unduhan dari WebView lewat
+  NavigationDelegate.onNavigationRequest (jalur WebView.setDownloadListener
+  di webview_flutter_android) + kait JS untuk klik <a download> dan
+  window.open; URL berkas diteruskan ke DownloadService(PixeldrainApi())
+  .download(PdItem(name, size: 0), urlOverride: url) milik layar utama
+  (DownloadService.shared diisi DriveController) sehingga progres muncul di
+  pill HomeTab, sheet Transfers, dan notifikasi TransferService.
+- web_download_links: aturan URL/nama berkas Gofile yang bisa diuji.
+- download_service: kunci tugas berbasis URL untuk unduhan urlOverride
+  (dua berkas Gofile tidak lagi saling menimpa), header tambahan opsional
+  (Cookie sesi WebView), probe ikut memakai header tersebut.
+- Cookie sesi WebView diteruskan supaya berkas akun (bukan guest) terunduh.
+- Tes: pola URL/nama berkas, unduhan urlOverride, kunci unik, dedupe klik
+  ganda, plus uji manual 2,3 GB (BIG=1).
+---
+ lib/controllers/drive_controller.dart |   9 +-
+ lib/screens/gofile_web_screen.dart    | 210 ++++++++++++++++++++++++--
+ lib/services/download_service.dart    |  27 +++-
+ lib/services/web_download_links.dart  |  75 +++++++++
+ pubspec.yaml                          |   2 +-
+ test/big_file_test.dart               | 154 +++++++++++++++++++
+ test/download_service_test.dart       |  82 ++++++++++
+ test/web_download_links_test.dart     | 120 +++++++++++++++
+ 8 files changed, 658 insertions(+), 21 deletions(-)
+ create mode 100644 lib/services/web_download_links.dart
+ create mode 100644 test/big_file_test.dart
+ create mode 100644 test/web_download_links_test.dart
+
+diff --git a/lib/controllers/drive_controller.dart b/lib/controllers/drive_controller.dart
+index 19c0ec8..9773f4a 100644
+--- a/lib/controllers/drive_controller.dart
++++ b/lib/controllers/drive_controller.dart
+@@ -32,7 +32,11 @@ class UploadTask {
+ 
+ /// State utama aplikasi: daftar file dari Pixeldrain + status sync + upload.
+ class DriveController extends ChangeNotifier {
+-  DriveController(this.api) : downloads = DownloadService(api);
++  DriveController(this.api) : downloads = DownloadService(api) {
++    // Unduhan dari layar lain (WebView Gofile) memakai instance yang sama,
++    // supaya pill HomeTab dan sheet Transfers menampilkannya.
++    DownloadService.shared = downloads;
++  }
+ 
+   final PixeldrainApi api;
+ 
+@@ -178,6 +182,9 @@ class DriveController extends ChangeNotifier {
+ 
+   @override
+   void dispose() {
++    if (identical(DownloadService.shared, downloads)) {
++      DownloadService.shared = null;
++    }
+     downloads.dispose();
+     super.dispose();
+   }
+diff --git a/lib/screens/gofile_web_screen.dart b/lib/screens/gofile_web_screen.dart
+index 570988a..3b18751 100644
+--- a/lib/screens/gofile_web_screen.dart
++++ b/lib/screens/gofile_web_screen.dart
+@@ -1,12 +1,31 @@
++import 'dart:async';
++import 'dart:convert';
++
+ import 'package:flutter/material.dart';
++import 'package:flutter/services.dart';
+ import 'package:webview_flutter/webview_flutter.dart';
+ 
++import '../l10n/locale_controller.dart';
++import '../models/pd_item.dart';
++import '../services/download_service.dart';
++import '../services/pixeldrain_api.dart';
++import '../services/web_download_links.dart';
+ import '../theme/app_theme.dart';
+ import '../widgets/kit.dart';
+-import '../widgets/motion.dart';
+ 
+ /// Gofile di dalam aplikasi: memakai sesi web resmi mereka, tapi tampilan
+ /// diselaraskan dengan tema aplikasi (warna, radius, header sendiri).
++///
++/// Unduhan yang dimulai dari halaman Gofile tidak diserahkan ke downloader
++/// browser WebView, melainkan diteruskan ke [DownloadService] aplikasi:
++/// - `WebView.setDownloadListener` Android (lewat `NavigationDelegate
++///   .onNavigationRequest` di webview_flutter_android) menangkap tautan berkas
++///   maupun respons `Content-Disposition: attachment`.
++/// - Kait JavaScript kecil di halaman menangkap klik `<a download>` dan
++///   `window.open` untuk URL yang sama, sekaligus memberi nama berkas asli.
++///
++/// Hasilnya tampil di pill progres HomeTab dan sheet Transfers, dengan
++/// notifikasi sistem dari TransferService seperti unduhan Pixeldrain.
+ class GofileWebScreen extends StatefulWidget {
+   const GofileWebScreen({super.key, this.url, this.token});
+ 
+@@ -21,21 +40,55 @@ class GofileWebScreen extends StatefulWidget {
+ }
+ 
+ class _GofileWebScreenState extends State<GofileWebScreen> {
+-  late final WebViewController _web = WebViewController()
+-    ..setJavaScriptMode(JavaScriptMode.unrestricted)
+-    ..setBackgroundColor(AppColors.bg)
+-    ..setNavigationDelegate(
+-      NavigationDelegate(
+-        onPageFinished: (_) => _applyTheme(),
+-      ),
+-    )
+-    ..loadRequest(
+-      Uri.parse(
+-        widget.token != null && widget.token!.isNotEmpty
+-            ? 'https://gofile.io/login/${widget.token}'
+-            : (widget.url ?? 'https://gofile.io/'),
+-      ),
+-    );
++  /// Kanal JS → Dart untuk tautan unduhan (lebih akurat daripada URL saja).
++  static const String _jsChannel = 'DropifyWebDownload';
++
++  late final WebViewController _web;
++
++  /// Dipakai hanya kalau layar ini dibuka tanpa DriveController.
++  DownloadService? _ownDownloads;
++
++  /// URL yang sudah diteruskan, supaya satu klik tidak masuk dua kali
++  /// (DownloadListener + kait JS).
++  final Set<String> _handled = <String>{};
++
++  /// Unduhan masuk ke service milik layar utama supaya pill HomeTab dan sheet
++  /// Transfers menampilkannya; kalau belum ada, pakai instance sendiri.
++  DownloadService get _downloads {
++    final shared = DownloadService.shared;
++    return shared ?? (_ownDownloads ??= DownloadService(PixeldrainApi()));
++  }
++
++  String get _startUrl => widget.token != null && widget.token!.isNotEmpty
++      ? 'https://gofile.io/login/${widget.token}'
++      : (widget.url ?? 'https://gofile.io/');
++
++  @override
++  void initState() {
++    super.initState();
++    _web = WebViewController()
++      ..setJavaScriptMode(JavaScriptMode.unrestricted)
++      ..setBackgroundColor(AppColors.bg)
++      ..addJavaScriptChannel(_jsChannel, onMessageReceived: _onJsMessage)
++      ..setNavigationDelegate(
++        NavigationDelegate(
++          onPageFinished: (_) => _onPageFinished(),
++          onNavigationRequest: _onNavigationRequest,
++        ),
++      )
++      ..loadRequest(Uri.parse(_startUrl));
++  }
++
++  @override
++  void dispose() {
++    _ownDownloads?.dispose();
++    super.dispose();
++  }
++
++  Future<void> _onPageFinished() async {
++    await _applyTheme();
++    await _installDownloadHooks();
++  }
+ 
+   /// Selaraskan tampilan Gofile dengan tema aplikasi: warna permukaan, sudut
+   /// membulat, font, dan sembunyikan elemen navigasi mereka yang redundan.
+@@ -73,6 +126,131 @@ class _GofileWebScreenState extends State<GofileWebScreen> {
+     ''');
+   }
+ 
++  /// Kait unduhan di halaman: klik tautan berkas dan `window.open` dikirim ke
++  /// Dart. Tidak menyentuh apa pun yang bukan tautan berkas Gofile.
++  Future<void> _installDownloadHooks() async {
++    const script = r'''
++      (function () {
++        if (window.__dropifyDownloadHooks) return;
++        window.__dropifyDownloadHooks = true;
++
++        function send(url, name) {
++          try {
++            DropifyWebDownload.postMessage(JSON.stringify({
++              url: String(url || ''),
++              name: name ? String(name) : ''
++            }));
++          } catch (e) {}
++        }
++
++        function isFileUrl(url) {
++          if (!/^https?:\/\//i.test(url || '')) return false;
++          if (/gofile\.io\/download/i.test(url)) return true;
++          return /[?&]download(=|&|$)/i.test(url);
++        }
++
++        function anchorOf(node) {
++          while (node && node.tagName !== 'A') node = node.parentElement;
++          return node;
++        }
++
++        document.addEventListener('click', function (event) {
++          var a = anchorOf(event.target);
++          if (!a || !a.href) return;
++          if (!a.hasAttribute('download') && !isFileUrl(a.href)) return;
++          if (/^(blob|data):/i.test(a.href)) return;
++          event.preventDefault();
++          event.stopPropagation();
++          send(a.href, a.getAttribute('download') || a.getAttribute('title') || '');
++        }, true);
++
++        var open = window.open;
++        window.open = function (url) {
++          if (typeof url === 'string' && isFileUrl(url)) {
++            send(url, '');
++            return null;
++          }
++          return open.apply(window, arguments);
++        };
++      })();
++    ''';
++    try {
++      await _web.runJavaScript(script);
++    } catch (_) {
++      // Halaman belum siap / JS dimatikan; jalur DownloadListener tetap jalan.
++    }
++  }
++
++  /// Dipanggil webview_flutter_android untuk setiap navigasi bingkai utama —
++  /// termasuk awal unduhan dari `DownloadListener`.
++  NavigationDecision _onNavigationRequest(NavigationRequest request) {
++    if (WebDownloadLinks.isGofileDownloadUrl(request.url)) {
++      unawaited(_startDownload(request.url));
++      // Jangan muat berkasnya di WebView; biarkan halaman tetap terbuka.
++      return NavigationDecision.prevent;
++    }
++    return NavigationDecision.navigate;
++  }
++
++  void _onJsMessage(JavaScriptMessage message) {
++    Map<String, dynamic> data;
++    try {
++      data = jsonDecode(message.message) as Map<String, dynamic>;
++    } catch (_) {
++      return;
++    }
++    final url = (data['url'] ?? '').toString();
++    if (!WebDownloadLinks.isDownloadable(url)) return;
++    unawaited(_startDownload(url, preferredName: (data['name'] ?? '').toString()));
++  }
++
++  /// Teruskan URL berkas ke DownloadService aplikasi.
++  Future<void> _startDownload(String url, {String? preferredName}) async {
++    if (!WebDownloadLinks.isDownloadable(url)) return;
++    if (!_handled.add(url)) return;
++    // DownloadListener dan kait JS bisa melaporkan klik yang sama; setelah
++    // beberapa detik URL dilepas lagi supaya bisa diunduh ulang.
++    Timer(const Duration(seconds: 4), () => _handled.remove(url));
++
++    final s = context.s;
++    final name = WebDownloadLinks.fileNameFromUrl(url, preferred: preferredName);
++    final headers = await _cookieHeaders(url);
++
++    if (!mounted) return;
++    HapticFeedback.selectionClick();
++    showAppSnack(context, s.downloadStartedSnack(name));
++
++    final task = await _downloads.download(
++      PdItem(name: name, size: 0),
++      urlOverride: url,
++      headers: headers,
++    );
++
++    if (!mounted) return;
++    if (task == null || task.status == DownloadStatus.error) {
++      showAppSnack(
++        context,
++        s.downloadFailedSnack(name, task?.error ?? s.downloadFailed),
++      );
++    }
++  }
++
++  /// Cookie sesi WebView (login Gofile) ikut dikirim ke permintaan unduhan,
++  /// supaya berkas akun — bukan hanya tautan guest — bisa diambil.
++  Future<Map<String, String>> _cookieHeaders(String url) async {
++    final uri = Uri.tryParse(url);
++    if (uri == null) return const {};
++    try {
++      final cookies = await WebViewCookieManager().platform.getCookies(uri);
++      if (cookies.isEmpty) return const {};
++      return {
++        'Cookie': cookies.map((c) => '${c.name}=${c.value}').join('; '),
++      };
++    } catch (_) {
++      return const {};
++    }
++  }
++
+   @override
+   Widget build(BuildContext context) {
+     return Scaffold(
+diff --git a/lib/services/download_service.dart b/lib/services/download_service.dart
+index b60683f..46f66e3 100644
+--- a/lib/services/download_service.dart
++++ b/lib/services/download_service.dart
+@@ -28,6 +28,7 @@ class DownloadTask {
+     required this.directHeaders,
+     required this.notifyId,
+     this.urlOverride,
++    this.extraHeaders = const {},
+     int sizeHint = 0,
+   }) : size = sizeHint;
+ 
+@@ -41,6 +42,10 @@ class DownloadTask {
+   /// Link bypass siap pakai (dipakai saat download dari link orang lain).
+   final String? urlOverride;
+ 
++  /// Header tambahan untuk URL di luar Pixeldrain (mis. Cookie sesi WebView
++  /// Gofile). Selalu ikut dikirim, termasuk saat [urlOverride] dipakai.
++  final Map<String, String> extraHeaders;
++
+   String name;
+   int size;
+   int received = 0;
+@@ -203,6 +208,11 @@ class DownloadService extends ChangeNotifier {
+   final String? _folderOverride;
+   final Dio _dio;
+ 
++  /// Instance yang dipakai layar utama (pill HomeTab + sheet Transfers).
++  /// Diisi oleh [DriveController] supaya unduhan yang dimulai dari layar lain
++  /// (mis. WebView Gofile) muncul di tempat yang sama.
++  static DownloadService? shared;
++
+   final List<DownloadTask> tasks = <DownloadTask>[];
+ 
+   int _seq = 0;
+@@ -214,11 +224,19 @@ class DownloadService extends ChangeNotifier {
+ 
+   String get folderPath => _folderOverride ?? NativeDownloads.folderPath;
+ 
+-  Future<DownloadTask?> download(PdItem item, {String? urlOverride}) async {
++  Future<DownloadTask?> download(
++    PdItem item, {
++    String? urlOverride,
++    Map<String, String> headers = const {},
++  }) async {
+     if (item.isDir) return null;
+ 
+     final fileId = (item.id ?? '').trim();
+-    final key = fileId.isNotEmpty ? 'id:$fileId' : 'fs:${item.fsPath.join('/')}';
++    // Unduhan dari URL luar (Gofile/WebView) tidak punya id Pixeldrain: kuncinya
++    // URL itu sendiri, supaya dua berkas berbeda tidak saling menimpa.
++    final key = urlOverride != null
++        ? 'url:$urlOverride'
++        : (fileId.isNotEmpty ? 'id:$fileId' : 'fs:${item.fsPath.join('/')}');
+     for (final t in tasks) {
+       if (t.key == key && t.isActive) return t;
+     }
+@@ -232,6 +250,7 @@ class DownloadService extends ChangeNotifier {
+       directHeaders: api.authHeaders,
+       notifyId: 4200 + _seq++,
+       urlOverride: urlOverride,
++      extraHeaders: headers,
+       sizeHint: item.size,
+     );
+ 
+@@ -341,7 +360,7 @@ class DownloadService extends ChangeNotifier {
+ 
+     final override = task.urlOverride;
+     if (override != null) {
+-      final probe = await _probeUrl(override, const {});
++      final probe = await _probeUrl(override, task.extraHeaders);
+       if (_disposed || task.canceled) return;
+       if (probe.ok) {
+         await _run(
+@@ -706,6 +725,7 @@ class DownloadService extends ChangeNotifier {
+               ..._browserHeaders,
+               'Accept': '*/*',
+               'Range': 'bytes=$from-${chunk.end}',
++              ...task.extraHeaders,
+               if (!task.viaBypass) ...task.directHeaders,
+             },
+             responseType: ResponseType.stream,
+@@ -819,6 +839,7 @@ class DownloadService extends ChangeNotifier {
+ 
+     final headers = <String, String>{..._browserHeaders, 'Accept': '*/*'};
+     if (start > 0) headers['Range'] = 'bytes=$start-';
++    headers.addAll(task.extraHeaders);
+     if (!task.viaBypass) headers.addAll(task.directHeaders);
+ 
+     final token = CancelToken();
+diff --git a/lib/services/web_download_links.dart b/lib/services/web_download_links.dart
+new file mode 100644
+index 0000000..df4d318
+--- /dev/null
++++ b/lib/services/web_download_links.dart
+@@ -0,0 +1,75 @@
++/// Aturan kecil untuk unduhan yang dimulai dari WebView Gofile.
++///
++/// WebView Android melaporkan awal unduhan lewat `DownloadListener`, dan
++/// webview_flutter_android meneruskannya sebagai `onNavigationRequest`
++/// (`isForMainFrame: true`) berisi URL berkasnya. Supaya halaman situs tidak
++/// ikut dianggap berkas, pencocokan URL dibuat ketat di sini dan bisa diuji
++/// tanpa WebView.
++class WebDownloadLinks {
++  WebDownloadLinks._();
++
++  /// Nama berkas cadangan kalau URL tidak menyebutkannya.
++  static const String fallbackName = 'gofile-download';
++
++  /// true kalau [raw] adalah URL berkas Gofile yang harus diunduh aplikasi,
++  /// bukan halaman yang harus dimuat WebView.
++  static bool isGofileDownloadUrl(String raw) {
++    final uri = Uri.tryParse(raw);
++    if (uri == null || !uri.hasAuthority) return false;
++    final scheme = uri.scheme.toLowerCase();
++    if (scheme != 'https' && scheme != 'http') return false;
++
++    final host = uri.host.toLowerCase();
++    final path = uri.path.toLowerCase();
++
++    // Domain utama: hanya jalur unduhan langsung. Halaman biasa
++    // (gofile.io/d/xxx, folder, akun) tetap dimuat di WebView.
++    if (host == 'gofile.io' || host == 'www.gofile.io') {
++      if (path.startsWith('/download/direct/')) return true;
++      if (path.startsWith('/download/web/')) return true;
++      if (uri.queryParameters.containsKey('download')) return true;
++      return path.startsWith('/download/') && _hasFileExtension(uri.path);
++    }
++
++    // Node penyimpanan (mis. store-eu-par-1.gofile.io) selalu menyajikan
++    // berkas, bukan halaman.
++    if (host.endsWith('.gofile.io')) {
++      return path.contains('/download/') || _hasFileExtension(uri.path);
++    }
++
++    return false;
++  }
++
++  /// true kalau [raw] bisa diunduh DownloadService (http/https saja).
++  static bool isDownloadable(String raw) {
++    final uri = Uri.tryParse(raw);
++    if (uri == null || !uri.hasAuthority) return false;
++    final scheme = uri.scheme.toLowerCase();
++    return scheme == 'https' || scheme == 'http';
++  }
++
++  /// Nama berkas dari URL; [preferred] (mis. atribut `download` pada tautan)
++  /// dipakai lebih dulu kalau berisi nama yang masuk akal.
++  static String fileNameFromUrl(String raw, {String? preferred}) {
++    final wanted = (preferred ?? '').trim();
++    if (wanted.isNotEmpty) return wanted;
++
++    final uri = Uri.tryParse(raw);
++    if (uri != null && uri.pathSegments.isNotEmpty) {
++      final last = uri.pathSegments.last.trim();
++      if (last.isNotEmpty) {
++        final decoded = Uri.decodeComponent(last);
++        if (_hasFileExtension(decoded) || decoded.length > 2) return decoded;
++      }
++    }
++    return fallbackName;
++  }
++
++  static bool _hasFileExtension(String path) {
++    final segment = path.split('/').last;
++    final dot = segment.lastIndexOf('.');
++    if (dot <= 0 || dot == segment.length - 1) return false;
++    final ext = segment.substring(dot + 1).toLowerCase();
++    return RegExp(r'^[a-z0-9]{1,8}$').hasMatch(ext);
++  }
++}
+diff --git a/pubspec.yaml b/pubspec.yaml
+index aba9527..a7ac707 100644
+--- a/pubspec.yaml
++++ b/pubspec.yaml
+@@ -1,7 +1,7 @@
+ name: dropify
+ description: A Pixeldrain Client.
+ publish_to: 'none'
+-version: 1.7.1+17
++version: 1.7.2+18
+ 
+ environment:
+   sdk: '>=3.0.0 <4.0.0'
+diff --git a/test/big_file_test.dart b/test/big_file_test.dart
+new file mode 100644
+index 0000000..d635319
+--- /dev/null
++++ b/test/big_file_test.dart
+@@ -0,0 +1,154 @@
++import 'dart:io';
++
++import 'dart:math' as math;
++import 'dart:typed_data';
++
++import 'package:dio/dio.dart';
++import 'package:dropify/models/pd_item.dart';
++import 'package:dropify/services/download_service.dart';
++import 'package:dropify/services/pixeldrain_api.dart';
++import 'package:flutter/services.dart';
++import 'package:flutter_test/flutter_test.dart';
++import 'package:shared_preferences/shared_preferences.dart';
++
++/// Uji manual untuk berkas > 2 GB (bug lama: penulisan append membuat berkas
++/// membengkak di atas 4 GB, dan offset tiap potongan diabaikan OS).
++/// Jalankan dengan:
++///
++///   BIG=1 flutter test test/big_file_test.dart --timeout none
++///
++/// Normalnya dilewati supaya `flutter test` tetap cepat.
++const int _size = 2300 * 1024 * 1024; // 2,3 GB
++
++/// Sumber byte sintetis yang mendukung Range: byte ke-n = n % 256.
++class _BigAdapter implements HttpClientAdapter {
++  int requests = 0;
++
++  @override
++  Future<ResponseBody> fetch(
++    RequestOptions options,
++    Stream<Uint8List>? requestStream,
++    Future<void>? cancelFuture,
++  ) async {
++    requests++;
++    final range = options.headers['Range'] as String?;
++    var start = 0;
++    var end = _size - 1;
++    var status = 200;
++    if (range != null) {
++      final match = RegExp(r'bytes=(\d+)-(\d*)').firstMatch(range);
++      if (match != null) {
++        start = int.parse(match.group(1)!);
++        final rawEnd = match.group(2) ?? '';
++        if (rawEnd.isNotEmpty) end = math.min(int.parse(rawEnd), _size - 1);
++        status = 206;
++      }
++    }
++
++    Stream<Uint8List> body() async* {
++      const piece = 256 * 1024;
++      final buffer = Uint8List(piece);
++      var cursor = start;
++      while (cursor <= end) {
++        final take = math.min(piece, end - cursor + 1);
++        for (var i = 0; i < take; i++) {
++          buffer[i] = (cursor + i) & 0xFF;
++        }
++        yield Uint8List.fromList(Uint8List.sublistView(buffer, 0, take));
++        cursor += take;
++      }
++    }
++
++    return ResponseBody(
++      body(),
++      status,
++      headers: {
++        Headers.contentLengthHeader: ['${end - start + 1}'],
++        HttpHeaders.acceptRangesHeader: ['bytes'],
++        if (status == 206)
++          HttpHeaders.contentRangeHeader: ['bytes $start-$end/$_size'],
++      },
++    );
++  }
++
++  @override
++  void close({bool force = false}) {}
++}
++
++void main() {
++  TestWidgetsFlutterBinding.ensureInitialized();
++
++  final enabled = Platform.environment['BIG'] == '1';
++
++  setUp(() {
++    SharedPreferences.setMockInitialValues({});
++    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
++        .setMockMethodCallHandler(
++      const MethodChannel('com.nel.dropify/native'),
++      (call) async => true,
++    );
++  });
++
++  tearDown(() {
++    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
++        .setMockMethodCallHandler(
++      const MethodChannel('com.nel.dropify/native'),
++      null,
++    );
++  });
++
++  test(
++    'berkas 2,3 GB utuh: ukuran tepat dan byte di offset benar',
++    () async {
++      final dir = await Directory.systemTemp.createTemp('dropify_big');
++      final adapter = _BigAdapter();
++      final service = DownloadService(
++        PixeldrainApi(),
++        dio: Dio()..httpClientAdapter = adapter,
++        folderOverride: dir.path,
++        parallelMinSize: 16 * 1024 * 1024,
++        minSegmentSize: 8 * 1024 * 1024,
++        probe: (url, headers) async =>
++            ProbeResult.ok(url, size: _size, ranges: true),
++      );
++
++      final task = await service.download(
++        const PdItem(name: 'raksasa.bin', size: 0),
++        urlOverride:
++            'https://store-eu-par-1.gofile.io/download/web/tok/raksasa.bin',
++      );
++      expect(task, isNotNull);
++      final done = task!;
++      service.dispose();
++
++      expect(done.status, DownloadStatus.done, reason: done.error ?? '');
++      expect(adapter.requests, greaterThan(1), reason: 'harus paralel');
++      expect(done.size, _size);
++
++      final file = File(done.path!);
++      expect(await file.length(), _size, reason: 'ukuran harus tepat');
++
++      final raf = await file.open();
++      try {
++        for (final offset in [
++          0,
++          1,
++          4095,
++          1 << 20,
++          (2 * 1024 * 1024 * 1024) - 8,
++          _size - 1,
++        ]) {
++          await raf.setPosition(offset);
++          final byte = await raf.read(1);
++          expect(byte.first, offset & 0xFF, reason: 'offset $offset');
++        }
++      } finally {
++        await raf.close();
++      }
++
++      await dir.delete(recursive: true);
++    },
++    skip: enabled ? false : 'set BIG=1 untuk menguji berkas > 2 GB',
++    timeout: const Timeout(Duration(minutes: 40)),
++  );
++}
+diff --git a/test/download_service_test.dart b/test/download_service_test.dart
+index 1b17c01..9a493a5 100644
+--- a/test/download_service_test.dart
++++ b/test/download_service_test.dart
+@@ -18,6 +18,7 @@ class _FakeAdapter implements HttpClientAdapter {
+   final bool truncateFirst;
+   int calls = 0;
+   final List<String?> requestedRanges = [];
++  final List<Map<String, dynamic>> headersSeen = [];
+ 
+   @override
+   Future<ResponseBody> fetch(
+@@ -27,6 +28,7 @@ class _FakeAdapter implements HttpClientAdapter {
+   ) async {
+     final rangeHeader = options.headers['Range'] as String?;
+     requestedRanges.add(rangeHeader);
++    headersSeen.add(Map<String, dynamic>.from(options.headers));
+ 
+     var start = 0;
+     var status = 200;
+@@ -224,4 +226,84 @@ void main() {
+     service.dispose();
+     await dir.delete(recursive: true);
+   });
++
++  test('URL luar (WebView Gofile) diunduh lewat urlOverride', () async {
++    final dir = await Directory.systemTemp.createTemp('dropify_dl');
++    final adapter = _FakeAdapter(total: 64 * 1024);
++    final service = await makeService(adapter, dir);
++
++    final task = await service.download(
++      const PdItem(name: 'berkas goweb.bin', size: 0),
++      urlOverride:
++          'https://store-eu-par-1.gofile.io/download/web/tok/berkas%20goweb.bin',
++      headers: const {'Cookie': 'accountToken=abc'},
++    );
++    await waitDone(task!);
++
++    expect(task.status, DownloadStatus.done, reason: task.error ?? '');
++    expect(task.viaBypass, isTrue, reason: 'URL luar bukan jalur bypass');
++    expect(task.url, contains('gofile.io'));
++    expect(await File(task.path!).length(), 64 * 1024);
++    expect(
++      adapter.headersSeen.any((h) => h['Cookie'] == 'accountToken=abc'),
++      isTrue,
++      reason: 'cookie sesi WebView harus ikut terkirim',
++    );
++
++    service.dispose();
++    await dir.delete(recursive: true);
++  });
++
++  test('dua URL luar berbeda tidak saling menimpa', () async {
++    final dir = await Directory.systemTemp.createTemp('dropify_dl');
++    final adapter = _FakeAdapter(total: 64 * 1024);
++    final service = await makeService(adapter, dir);
++
++    final first = service.download(
++      const PdItem(name: 'satu.bin', size: 0),
++      urlOverride: 'https://store-eu-par-1.gofile.io/download/web/a/satu.bin',
++    );
++    final second = service.download(
++      const PdItem(name: 'dua.bin', size: 0),
++      urlOverride: 'https://store-eu-par-1.gofile.io/download/web/b/dua.bin',
++    );
++
++    final a = await first;
++    final b = await second;
++    await waitDone(a!);
++    await waitDone(b!);
++
++    expect(a.id, isNot(b.id), reason: 'kunci tugas harus unik per URL');
++    expect(a.status, DownloadStatus.done, reason: a.error ?? '');
++    expect(b.status, DownloadStatus.done, reason: b.error ?? '');
++    expect(File(a.path!).parent.path, dir.path);
++    expect(File(b.path!).parent.path, dir.path);
++
++    service.dispose();
++    await dir.delete(recursive: true);
++  });
++
++  test('URL yang sama saat masih aktif dipakai bersama', () async {
++    final dir = await Directory.systemTemp.createTemp('dropify_dl');
++    final adapter = _FakeAdapter(total: 64 * 1024);
++    final service = await makeService(adapter, dir);
++    const url = 'https://store-eu-par-1.gofile.io/download/web/c/sama.bin';
++
++    final first = service.download(
++      const PdItem(name: 'sama.bin', size: 0),
++      urlOverride: url,
++    );
++    final second = service.download(
++      const PdItem(name: 'sama.bin', size: 0),
++      urlOverride: url,
++    );
++    final a = await first;
++    final b = await second;
++    await waitDone(a!);
++
++    expect(b!.id, a.id, reason: 'klik ganda tidak boleh membuat dua unduhan');
++
++    service.dispose();
++    await dir.delete(recursive: true);
++  });
+ }
+diff --git a/test/web_download_links_test.dart b/test/web_download_links_test.dart
+new file mode 100644
+index 0000000..fc7a828
+--- /dev/null
++++ b/test/web_download_links_test.dart
+@@ -0,0 +1,120 @@
++import 'package:dropify/services/web_download_links.dart';
++import 'package:flutter_test/flutter_test.dart';
++
++void main() {
++  group('isGofileDownloadUrl', () {
++    test('node penyimpanan = berkas', () {
++      expect(
++        WebDownloadLinks.isGofileDownloadUrl(
++          'https://store-eu-par-1.gofile.io/download/web/tok/berkas.zip',
++        ),
++        isTrue,
++      );
++      expect(
++        WebDownloadLinks.isGofileDownloadUrl(
++          'https://store1.gofile.io/download/abc123/foto.jpg',
++        ),
++        isTrue,
++      );
++    });
++
++    test('jalur unduhan langsung di domain utama', () {
++      expect(
++        WebDownloadLinks.isGofileDownloadUrl(
++          'https://gofile.io/download/direct/abc123',
++        ),
++        isTrue,
++      );
++      expect(
++        WebDownloadLinks.isGofileDownloadUrl(
++          'https://gofile.io/download/web/abc123/film.mkv',
++        ),
++        isTrue,
++      );
++      expect(
++        WebDownloadLinks.isGofileDownloadUrl(
++          'https://gofile.io/dl?id=abc&download=1',
++        ),
++        isTrue,
++      );
++    });
++
++    test('halaman biasa tetap dimuat WebView', () {
++      for (final url in [
++        'https://gofile.io/',
++        'https://gofile.io/d/abc123',
++        'https://gofile.io/login/token',
++        'https://gofile.io/download/direct',
++        'https://www.gofile.io/contents/abc123',
++      ]) {
++        expect(WebDownloadLinks.isGofileDownloadUrl(url), isFalse,
++            reason: url);
++      }
++    });
++
++    test('situs lain tidak pernah diambil alih', () {
++      expect(
++        WebDownloadLinks.isGofileDownloadUrl(
++          'https://pixeldrain.com/api/file/abc?download',
++        ),
++        isFalse,
++      );
++      expect(
++        WebDownloadLinks.isGofileDownloadUrl('https://example.com/download/x.zip'),
++        isFalse,
++      );
++      expect(WebDownloadLinks.isGofileDownloadUrl('blob:https://gofile.io/x'),
++          isFalse);
++      expect(WebDownloadLinks.isGofileDownloadUrl('javascript:void(0)'), isFalse);
++      expect(WebDownloadLinks.isGofileDownloadUrl('tidak-valid'), isFalse);
++    });
++  });
++
++  group('fileNameFromUrl', () {
++    test('ambil segmen terakhir URL', () {
++      expect(
++        WebDownloadLinks.fileNameFromUrl(
++          'https://store-eu-par-1.gofile.io/download/web/tok/berkas%20saya.zip',
++        ),
++        'berkas saya.zip',
++      );
++      expect(
++        WebDownloadLinks.fileNameFromUrl(
++          'https://gofile.io/download/direct/abc/foto.jpg?token=1',
++        ),
++        'foto.jpg',
++      );
++    });
++
++    test('nama dari atribut download dipakai lebih dulu', () {
++      expect(
++        WebDownloadLinks.fileNameFromUrl(
++          'https://store-eu-par-1.gofile.io/download/web/tok/hash',
++          preferred: 'Laporan Akhir.pdf',
++        ),
++        'Laporan Akhir.pdf',
++      );
++    });
++
++    test('URL tanpa nama berkas -> nama cadangan', () {
++      expect(
++        WebDownloadLinks.fileNameFromUrl('https://gofile.io/download/direct/'),
++        WebDownloadLinks.fallbackName,
++      );
++      expect(
++        WebDownloadLinks.fileNameFromUrl('https://store1.gofile.io/download/a/b/'),
++        WebDownloadLinks.fallbackName,
++      );
++    });
++  });
++
++  group('isDownloadable', () {
++    test('hanya http/https', () {
++      expect(WebDownloadLinks.isDownloadable('https://gofile.io/a'), isTrue);
++      expect(WebDownloadLinks.isDownloadable('http://gofile.io/a'), isTrue);
++      expect(WebDownloadLinks.isDownloadable('blob:https://a/b'), isFalse);
++      expect(WebDownloadLinks.isDownloadable('data:text/plain,hi'), isFalse);
++      expect(WebDownloadLinks.isDownloadable('about:blank'), isFalse);
++    });
++  });
++}
+-- 
+2.34.1
+

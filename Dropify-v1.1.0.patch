@@ -1,0 +1,240 @@
+From 583aff23c6cee898786520325f42415c474b5333 Mon Sep 17 00:00:00 2001
+From: design-bot <design@local>
+Date: Sun, 15 Nov 2026 05:02:50 +0000
+Subject: [PATCH] release: v1.1.0 (versionCode 2), keystore tetap, fix 403
+
+- pubspec 1.0.0+1 -> 1.1.0+2 (tiap update versionCode naik)
+- signingConfigs.release + android/app/dropify-release.jks (ikut repo) supaya
+  APK CI & lokal bertanda tangan sama -> update tanpa uninstall
+- download: User-Agent + Referer, probe fallback GET Range 0-0 saat HEAD 400/403
+- pesan 403 jelas + aksi Browser
+---
+ .gitignore                         |   1 +
+ android/app/build.gradle           |  13 ++++++++++++-
+ android/app/dropify-release.jks    | Bin 0 -> 2730 bytes
+ lib/services/download_service.dart |  25 ++++++++++++++++++++-----
+ lib/widgets/file_actions.dart      |  17 +++++++++++++++--
+ pubspec.yaml                       |   2 +-
+ 6 files changed, 49 insertions(+), 9 deletions(-)
+ create mode 100644 android/app/dropify-release.jks
+
+diff --git a/.gitignore b/.gitignore
+index aac9773..f0a7f47 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -14,3 +14,4 @@ android/local.properties
+ android/.gradle/
+ android/app/.cxx/
+ *.apk
++!android/app/dropify-release.jks
+diff --git a/android/app/build.gradle b/android/app/build.gradle
+index f36404d..21488f0 100644
+--- a/android/app/build.gradle
++++ b/android/app/build.gradle
+@@ -9,6 +9,17 @@ android {
+     compileSdk = flutter.compileSdkVersion
+     ndkVersion = flutter.ndkVersion
+ 
++    // Keystore ikut repo supaya APK dari CI maupun build lokal memakai tanda
++    // tangan yang sama -> update bisa dipasang tanpa uninstall.
++    signingConfigs {
++        release {
++            storeFile file("dropify-release.jks")
++            storePassword "dropify123"
++            keyAlias "dropify"
++            keyPassword "dropify123"
++        }
++    }
++
+     compileOptions {
+         sourceCompatibility = JavaVersion.VERSION_17
+         targetCompatibility = JavaVersion.VERSION_17
+@@ -24,7 +35,7 @@ android {
+ 
+     buildTypes {
+         release {
+-            signingConfig = signingConfigs.debug
++            signingConfig = signingConfigs.release
+         }
+     }
+ 
+diff --git a/android/app/dropify-release.jks b/android/app/dropify-release.jks
+new file mode 100644
+index 0000000000000000000000000000000000000000..40d2e6da2674c33050ba6989d3223941ad5136ba
+GIT binary patch
+literal 2730
+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
+RPf5F!MI%yT!sRdI{0rf4^F9Co
+
+literal 0
+HcmV?d00001
+
+diff --git a/lib/services/download_service.dart b/lib/services/download_service.dart
+index d86994f..b56e70d 100644
+--- a/lib/services/download_service.dart
++++ b/lib/services/download_service.dart
+@@ -124,6 +124,15 @@ class _RetryableError implements Exception {
+   final String message;
+ }
+ 
++/// Header yang menyerupai browser. Sebagian CDN/mirror membalas 403 untuk
++/// request tanpa User-Agent atau tanpa Referer.
++const Map<String, String> _browserHeaders = {
++  'User-Agent':
++      'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 '
++          '(KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
++  'Referer': 'https://pixeldrain.com/',
++};
++
+ /// Server mengabaikan header Range (balas 200, bukan 206).
+ class _RangeUnsupported implements Exception {}
+ 
+@@ -678,6 +687,7 @@ class DownloadService extends ChangeNotifier {
+           url,
+           options: Options(
+             headers: {
++              ..._browserHeaders,
+               'Accept': '*/*',
+               'Range': 'bytes=$from-${chunk.end}',
+               if (!task.viaBypass) ...task.directHeaders,
+@@ -791,7 +801,7 @@ class DownloadService extends ChangeNotifier {
+       start = 0;
+     }
+ 
+-    final headers = <String, String>{'Accept': '*/*'};
++    final headers = <String, String>{..._browserHeaders, 'Accept': '*/*'};
+     if (start > 0) headers['Range'] = 'bytes=$start-';
+     if (!task.viaBypass) headers.addAll(task.directHeaders);
+ 
+@@ -919,7 +929,11 @@ class DownloadService extends ChangeNotifier {
+     if (error is DioException) {
+       final code = error.response?.statusCode ?? 0;
+       if (code == 404) return 'File tidak ditemukan di Pixeldrain.';
+-      if (code == 401 || code == 403) return 'Akses file ditolak (HTTP $code).';
++      if (code == 403) {
++        return 'Server menolak (HTTP 403) — biasanya batas unduhan Pixeldrain '
++            'sudah tercapai atau file dibatasi. Coba lagi nanti / buka di browser.';
++      }
++      if (code == 401) return 'Akses file ditolak (HTTP 401).';
+       if (code == 429) return 'Server masih membatasi. Coba lagi nanti.';
+       if (code >= 500) return 'Server download bermasalah (HTTP $code).';
+       switch (error.type) {
+@@ -951,7 +965,7 @@ class DownloadService extends ChangeNotifier {
+       final res = await _dio.head(
+         url,
+         options: Options(
+-          headers: {...headers, 'Accept': '*/*'},
++          headers: {..._browserHeaders, ...headers, 'Accept': '*/*'},
+           receiveTimeout: const Duration(seconds: 15),
+           validateStatus: (_) => true,
+         ),
+@@ -970,8 +984,9 @@ class DownloadService extends ChangeNotifier {
+           ranges: ranges,
+         );
+       }
+-      if (code == 405 || code == 501) {
+-        // Sebagian server menolak HEAD; coba Range 0-0.
++      if (code == 400 || code == 403 || code == 405 || code == 501) {
++        // Sebagian server menolak HEAD atau request tanpa header browser;
++        // coba GET dengan Range 0-0.
+         return _probeRange(url, headers);
+       }
+       return ProbeResult.fail('HTTP $code');
+diff --git a/lib/widgets/file_actions.dart b/lib/widgets/file_actions.dart
+index 6f6fb17..74eea7a 100644
+--- a/lib/widgets/file_actions.dart
++++ b/lib/widgets/file_actions.dart
+@@ -85,12 +85,25 @@ Future<void> downloadItem(
+     text = s.downloadStartedSnack(task.name);
+   }
+ 
++  final forbidden = task.error?.contains('403') ?? false;
++  final fileId = (item.id ?? '').trim();
++
+   showAppSnack(
+     context,
+     text,
++    // Kalau server menolak (403), tawarkan buka di browser sebagai jalan lain.
+     action: SnackBarAction(
+-      label: s.downloads,
+-      onPressed: () => showTransfers(context, ctrl),
++      label: forbidden && fileId.isNotEmpty ? 'Browser' : s.downloads,
++      onPressed: () {
++        if (forbidden && fileId.isNotEmpty) {
++          launchUrl(
++            Uri.parse('https://pixeldrain.com/u/$fileId'),
++            mode: LaunchMode.externalApplication,
++          );
++        } else {
++          showTransfers(context, ctrl);
++        }
++      },
+     ),
+   );
+ }
+diff --git a/pubspec.yaml b/pubspec.yaml
+index d99a163..d34124b 100644
+--- a/pubspec.yaml
++++ b/pubspec.yaml
+@@ -1,7 +1,7 @@
+ name: dropify
+ description: A Pixeldrain Client.
+ publish_to: 'none'
+-version: 1.0.0+1
++version: 1.1.0+2
+ 
+ environment:
+   sdk: '>=3.0.0 <4.0.0'
+-- 
+2.34.1
+

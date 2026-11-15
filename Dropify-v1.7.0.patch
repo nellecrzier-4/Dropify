@@ -1,0 +1,270 @@
+From f37fde616dd8bf006dcef663a1a1884263eaea35 Mon Sep 17 00:00:00 2001
+From: design-bot <design@local>
+Date: Sun, 15 Nov 2026 08:30:18 +0000
+Subject: [PATCH] =?UTF-8?q?release:=20v1.7.0=20(versionCode=2016)=20?=
+ =?UTF-8?q?=E2=80=94=20Gofile=20WebView=20bertema?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ .../plugins/GeneratedPluginRegistrant.java    |   5 +
+ lib/screens/files_tab.dart                    |  23 +++-
+ lib/screens/gofile_web_screen.dart            | 108 ++++++++++++++++++
+ pubspec.lock                                  |  36 +++++-
+ pubspec.yaml                                  |   3 +-
+ 5 files changed, 171 insertions(+), 4 deletions(-)
+ create mode 100644 lib/screens/gofile_web_screen.dart
+
+diff --git a/android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java b/android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java
+index 4bb9966..6d57c21 100644
+--- a/android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java
++++ b/android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java
+@@ -40,5 +40,10 @@ public final class GeneratedPluginRegistrant {
+     } catch (Exception e) {
+       Log.e(TAG, "Error registering plugin url_launcher_android, io.flutter.plugins.urllauncher.UrlLauncherPlugin", e);
+     }
++    try {
++      flutterEngine.getPlugins().add(new io.flutter.plugins.webviewflutter.WebViewFlutterPlugin());
++    } catch (Exception e) {
++      Log.e(TAG, "Error registering plugin webview_flutter_android, io.flutter.plugins.webviewflutter.WebViewFlutterPlugin", e);
++    }
+   }
+ }
+diff --git a/lib/screens/files_tab.dart b/lib/screens/files_tab.dart
+index c1a8d6e..927da1e 100644
+--- a/lib/screens/files_tab.dart
++++ b/lib/screens/files_tab.dart
+@@ -12,6 +12,7 @@ import '../services/download_service.dart';
+ import '../services/gofile_api.dart';
+ import '../utils/file_types.dart';
+ import 'gofile_screen.dart';
++import 'gofile_web_screen.dart';
+ import '../widgets/kit.dart';
+ import '../widgets/motion.dart';
+ import 'file_list_screen.dart';
+@@ -121,6 +122,14 @@ class _GofileBrowserState extends State<_GofileBrowser> {
+     super.dispose();
+   }
+ 
++  void _openWeb(BuildContext context, [String? url]) {
++    Navigator.of(context).push(
++      SharedAxisPageRoute<void>(
++        builder: (_) => GofileWebScreen(url: url),
++      ),
++    );
++  }
++
+   Widget _linkBar(BuildContext context, GofileController ctrl) {
+     return Padding(
+       padding: const EdgeInsets.fromLTRB(20, 2, 20, 8),
+@@ -140,7 +149,19 @@ class _GofileBrowserState extends State<_GofileBrowser> {
+           ),
+           const SizedBox(width: 8),
+           IconButton.filledTonal(
+-            onPressed: () => ctrl.openShare(_link.text),
++            onPressed: () {
++              // Gofile membatasi API untuk akun gratis; buka lewat web resmi
++              // di dalam app supaya isi tetap bisa diakses.
++              final text = _link.text.trim();
++              if (text.isEmpty) {
++                _openWeb(context);
++              } else {
++                _openWeb(
++                  context,
++                  text.startsWith('http') ? text : 'https://gofile.io/d/$text',
++                );
++              }
++            },
+             icon: const Icon(Icons.arrow_forward_rounded),
+           ),
+         ],
+diff --git a/lib/screens/gofile_web_screen.dart b/lib/screens/gofile_web_screen.dart
+new file mode 100644
+index 0000000..15b060d
+--- /dev/null
++++ b/lib/screens/gofile_web_screen.dart
+@@ -0,0 +1,108 @@
++import 'package:flutter/material.dart';
++import 'package:webview_flutter/webview_flutter.dart';
++
++import '../theme/app_theme.dart';
++import '../widgets/kit.dart';
++import '../widgets/motion.dart';
++
++/// Gofile di dalam aplikasi: memakai sesi web resmi mereka, tapi tampilan
++/// diselaraskan dengan tema aplikasi (warna, radius, header sendiri).
++class GofileWebScreen extends StatefulWidget {
++  const GofileWebScreen({super.key, this.url});
++
++  final String? url;
++
++  @override
++  State<GofileWebScreen> createState() => _GofileWebScreenState();
++}
++
++class _GofileWebScreenState extends State<GofileWebScreen> {
++  late final WebViewController _web = WebViewController()
++    ..setJavaScriptMode(JavaScriptMode.unrestricted)
++    ..setBackgroundColor(AppColors.bg)
++    ..setNavigationDelegate(
++      NavigationDelegate(
++        onPageFinished: (_) => _applyTheme(),
++      ),
++    )
++    ..loadRequest(Uri.parse(widget.url ?? 'https://gofile.io/'));
++
++  /// Selaraskan tampilan Gofile dengan tema aplikasi: warna permukaan, sudut
++  /// membulat, font, dan sembunyikan elemen navigasi mereka yang redundan.
++  Future<void> _applyTheme() async {
++    final scheme = AppColors.scheme;
++    String hex(Color c) =>
++        '#${c.toARGB32().toRadixString(16).padLeft(8, '0').substring(2)}';
++    final css = '''
++      :root { color-scheme: ${AppColors.isDark ? 'dark' : 'light'}; }
++      body { background: ${hex(AppColors.bg)} !important;
++             color: ${hex(scheme.onSurface)} !important;
++             font-family: -apple-system, Roboto, sans-serif !important; }
++      header, nav, [data-nav], .sidebar { background: transparent !important; }
++      .panel, .card, [class*="rounded"] {
++        border-radius: 28px !important;
++        background: ${hex(scheme.surfaceContainerLow)} !important;
++        border-color: ${hex(scheme.outlineVariant)} !important;
++      }
++      a, button, [role="button"] { border-radius: 999px !important; }
++      .btn-primary, [class*="primary"] {
++        background: ${hex(scheme.primary)} !important;
++        color: ${hex(scheme.onPrimary)} !important;
++      }
++    ''';
++    await _web.runJavaScript('''
++      (function() {
++        var style = document.getElementById('dropify-theme');
++        if (!style) {
++          style = document.createElement('style');
++          style.id = 'dropify-theme';
++          document.head.appendChild(style);
++        }
++        style.textContent = `$css`;
++      })();
++    ''');
++  }
++
++  @override
++  Widget build(BuildContext context) {
++    return Scaffold(
++      body: SafeArea(
++        child: Column(
++          children: [
++            Padding(
++              padding: const EdgeInsets.fromLTRB(16, 10, 8, 6),
++              child: Row(
++                children: [
++                  IconButton.filledTonal(
++                    onPressed: () => Navigator.of(context).maybePop(),
++                    icon: const Icon(Icons.arrow_back_rounded),
++                  ),
++                  const SizedBox(width: 12),
++                  Expanded(
++                    child: Text(
++                      'Gofile',
++                      style: Theme.of(context).textTheme.headlineSmall,
++                    ),
++                  ),
++                  IconButton(
++                    tooltip: 'Refresh',
++                    onPressed: () => _web.reload(),
++                    icon: const Icon(Icons.refresh_rounded),
++                  ),
++                ],
++              ),
++            ),
++            Expanded(
++              child: ClipRRect(
++                borderRadius: const BorderRadius.vertical(
++                  top: Radius.circular(AppRadii.xl),
++                ),
++                child: WebViewWidget(controller: _web),
++              ),
++            ),
++          ],
++        ),
++      ),
++    );
++  }
++}
+diff --git a/pubspec.lock b/pubspec.lock
+index c1b2261..03c7759 100644
+--- a/pubspec.lock
++++ b/pubspec.lock
+@@ -506,6 +506,38 @@ packages:
+       url: "https://pub.dev"
+     source: hosted
+     version: "1.1.1"
++  webview_flutter:
++    dependency: "direct main"
++    description:
++      name: webview_flutter
++      sha256: d53e1ccf5516f25017e3c9d44c39034db352d20fa34fe200674270242c2c5111
++      url: "https://pub.dev"
++    source: hosted
++    version: "4.14.1"
++  webview_flutter_android:
++    dependency: transitive
++    description:
++      name: webview_flutter_android
++      sha256: "4de8b3d1ff4ebe1bdb42e68a5e4f809194a3cb0117a8f495f590004f00da3964"
++      url: "https://pub.dev"
++    source: hosted
++    version: "4.14.1"
++  webview_flutter_platform_interface:
++    dependency: transitive
++    description:
++      name: webview_flutter_platform_interface
++      sha256: "1221c1b12f5278791042f2ec2841743784cf25c5a644e23d6680e5d718824f04"
++      url: "https://pub.dev"
++    source: hosted
++    version: "2.15.1"
++  webview_flutter_wkwebview:
++    dependency: transitive
++    description:
++      name: webview_flutter_wkwebview
++      sha256: acac45e0a8d7beb1d0805521f44842f406c46eb5a69410f53d935e3c62138afc
++      url: "https://pub.dev"
++    source: hosted
++    version: "3.27.2"
+   win32:
+     dependency: transitive
+     description:
+@@ -523,5 +555,5 @@ packages:
+     source: hosted
+     version: "1.1.0"
+ sdks:
+-  dart: ">=3.13.0-0 <4.0.0"
+-  flutter: ">=3.24.0"
++  dart: ">=3.13.0 <4.0.0"
++  flutter: ">=3.47.0"
+diff --git a/pubspec.yaml b/pubspec.yaml
+index 3ce02b3..bd6ccdc 100644
+--- a/pubspec.yaml
++++ b/pubspec.yaml
+@@ -1,7 +1,7 @@
+ name: dropify
+ description: A Pixeldrain Client.
+ publish_to: 'none'
+-version: 1.6.3+15
++version: 1.7.0+16
+ 
+ environment:
+   sdk: '>=3.0.0 <4.0.0'
+@@ -19,6 +19,7 @@ dependencies:
+   file_picker: ^8.1.2
+   intl: ^0.20.3
+   url_launcher: ^6.3.0
++  webview_flutter: ^4.10.0
+ 
+ dev_dependencies:
+   flutter_test:
+-- 
+2.34.1
+

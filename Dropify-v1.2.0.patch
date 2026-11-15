@@ -1,0 +1,431 @@
+From e828e7c23592910b54feb56e7ac45205bf758fcc Mon Sep 17 00:00:00 2001
+From: design-bot <design@local>
+Date: Sun, 15 Nov 2026 05:45:22 +0000
+Subject: [PATCH] =?UTF-8?q?release:=20v1.2.0=20(versionCode=203)=20?=
+ =?UTF-8?q?=E2=80=94=20animasi=20UI?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- tab transition berarah, OrbIcon bernapas, FAB morph, bar storage animasi
+- version 1.2.0+3
+---
+ lib/l10n/app_strings.dart          |  9 +++++
+ lib/screens/home_screen.dart       |  9 ++++-
+ lib/services/download_service.dart | 43 +++++++++++++++------
+ lib/utils/errors.dart              | 15 ++++++++
+ lib/widgets/file_actions.dart      |  8 ++--
+ lib/widgets/kit.dart               | 60 +++++++++++++++++++++++-------
+ lib/widgets/motion.dart            |  4 +-
+ lib/widgets/transfers_sheet.dart   | 16 +++++---
+ pubspec.yaml                       |  2 +-
+ 9 files changed, 127 insertions(+), 39 deletions(-)
+ create mode 100644 lib/utils/errors.dart
+
+diff --git a/lib/l10n/app_strings.dart b/lib/l10n/app_strings.dart
+index 4103e4c..3d41569 100644
+--- a/lib/l10n/app_strings.dart
++++ b/lib/l10n/app_strings.dart
+@@ -132,6 +132,7 @@ abstract class AppStrings {
+   String get copyLink;
+   String get waitingNetwork;
+   String get storagePermission;
++  String get downloadNeedsPlan;
+   String get storagePermissionHint;
+   String get downloadFromLink;
+   String get linkHint;
+@@ -571,6 +572,10 @@ class StringsId extends AppStrings {
+   String get storagePermission =>
+       'Butuh izin "Akses semua file" supaya bisa menyimpan ke Download/Dropify.';
+ 
++  @override
++  String get downloadNeedsPlan =>
++      'File ini dilindungi Pixeldrain (hotlink/captcha). Perlu langganan berbayar atau buka halaman file di browser.';
++
+   @override
+   String get storagePermissionHint =>
+       'Buka pengaturan izin, aktifkan akses file, lalu tekan Coba lagi.';
+@@ -1130,6 +1135,10 @@ class StringsEn extends AppStrings {
+   String get storagePermission =>
+       'Needs "All files access" permission to save into Download/Dropify.';
+ 
++  @override
++  String get downloadNeedsPlan =>
++      'This file is protected by Pixeldrain (hotlink/captcha). A paid plan or the file page in a browser is required.';
++
+   @override
+   String get storagePermissionHint =>
+       'Open permission settings, allow file access, then tap Retry.';
+diff --git a/lib/screens/home_screen.dart b/lib/screens/home_screen.dart
+index 3c9bf75..4ef3607 100644
+--- a/lib/screens/home_screen.dart
++++ b/lib/screens/home_screen.dart
+@@ -74,8 +74,11 @@ class _HomeScreenState extends State<HomeScreen> {
+     );
+   }
+ 
++  bool _addOpen = false;
++
+   Future<void> _showAddMenu() async {
+     final s = context.s;
++    setState(() => _addOpen = true);
+     await showExpressiveSheet<void>(
+       context: context,
+       isScrollControlled: true,
+@@ -102,6 +105,7 @@ class _HomeScreenState extends State<HomeScreen> {
+         ],
+       ),
+     );
++    if (mounted) setState(() => _addOpen = false);
+   }
+ 
+   Future<void> _upload() async {
+@@ -172,7 +176,7 @@ class _HomeScreenState extends State<HomeScreen> {
+           Positioned(
+             right: 20,
+             bottom: 92 + safeBottom,
+-            child: _AddFab(onTap: _showAddMenu),
++            child: _AddFab(onTap: _showAddMenu, open: _addOpen),
+           ),
+         ],
+       ),
+@@ -183,9 +187,10 @@ class _HomeScreenState extends State<HomeScreen> {
+ /// Tombol aksi melayang M3: tonal (primary container), sudut 18, bayangan
+ /// lembut, dan mengecil saat ditekan.
+ class _AddFab extends StatelessWidget {
+-  const _AddFab({required this.onTap});
++  const _AddFab({required this.onTap, this.open = false});
+ 
+   final VoidCallback onTap;
++  final bool open;
+ 
+   @override
+   Widget build(BuildContext context) {
+diff --git a/lib/services/download_service.dart b/lib/services/download_service.dart
+index b56e70d..887cda7 100644
+--- a/lib/services/download_service.dart
++++ b/lib/services/download_service.dart
+@@ -403,6 +403,16 @@ class DownloadService extends ChangeNotifier {
+         return;
+       }
+       task.bypassError = last?.error ?? 'gagal';
++      if (task.bypassError == 'rate_limited') {
++        task
++          ..status = DownloadStatus.error
++          ..error = 'pixeldrain_rate_limited'
++          ..speed = 0
++          ..endedAt = DateTime.now();
++        NativeDownloads.cancelNotification(task.notifyId);
++        _notify();
++        return;
++      }
+     }
+ 
+     final directProbe = await _probeUrl(task.directUrl, task.directHeaders);
+@@ -420,11 +430,15 @@ class DownloadService extends ChangeNotifier {
+     }
+ 
+     final directError = directProbe.error ?? 'gagal';
++    final rateLimited =
++        directError == 'rate_limited' || task.bypassError == 'rate_limited';
+     task
+       ..status = DownloadStatus.error
+-      ..error = task.bypassError == null
+-          ? 'Pixeldrain: $directError'
+-          : 'Bypass: ${task.bypassError} · Pixeldrain: $directError'
++      ..error = rateLimited
++          ? 'pixeldrain_rate_limited'
++          : (task.bypassError == null
++              ? 'Pixeldrain: $directError'
++              : 'Bypass: ${task.bypassError} · Pixeldrain: $directError')
+       ..endedAt = DateTime.now();
+     _notify();
+   }
+@@ -1000,20 +1014,27 @@ class DownloadService extends ChangeNotifier {
+     Map<String, String> headers,
+   ) async {
+     try {
+-      final res = await _dio.get<ResponseBody>(
++      final res = await _dio.get<String>(
+         url,
+         options: Options(
+-          headers: {...headers, 'Accept': '*/*', 'Range': 'bytes=0-0'},
+-          responseType: ResponseType.stream,
++          headers: {
++            ..._browserHeaders,
++            ...headers,
++            'Accept': '*/*',
++            'Range': 'bytes=0-0',
++          },
++          responseType: ResponseType.plain,
+           validateStatus: (_) => true,
+         ),
+       );
+-      final body = res.data;
+-      if (body is ResponseBody) {
+-        unawaited(body.stream.listen(null).cancel());
+-      }
+       final code = res.statusCode ?? 0;
+       if (code != 200 && code != 206) {
++        final body = (res.data ?? '').toLowerCase();
++        if (body.contains('captcha_required') ||
++            body.contains('rate_limited') ||
++            body.contains('hotlink')) {
++          return ProbeResult.fail('rate_limited');
++        }
+         return ProbeResult.fail('HTTP $code');
+       }
+       final contentRange = res.headers.value('content-range') ?? '';
+@@ -1028,7 +1049,7 @@ class DownloadService extends ChangeNotifier {
+       return ProbeResult.ok(
+         res.realUri.toString(),
+         size: size,
+-        ranges: code == 206,
++        ranges: contentRange.isNotEmpty,
+       );
+     } on DioException catch (e) {
+       return ProbeResult.fail(e.message ?? e.type.name);
+diff --git a/lib/utils/errors.dart b/lib/utils/errors.dart
+new file mode 100644
+index 0000000..bf90435
+--- /dev/null
++++ b/lib/utils/errors.dart
+@@ -0,0 +1,15 @@
++import 'package:flutter/widgets.dart';
++
++import '../l10n/locale_controller.dart';
++
++/// Terjemahkan kode error internal jadi teks yang bisa dibaca pengguna.
++String describeDownloadError(BuildContext context, String? code) {
++  switch (code) {
++    case 'storage_permission':
++      return context.s.storagePermission;
++    case 'pixeldrain_rate_limited':
++      return context.s.downloadNeedsPlan;
++    default:
++      return code ?? '';
++  }
++}
+diff --git a/lib/widgets/file_actions.dart b/lib/widgets/file_actions.dart
+index 74eea7a..a083549 100644
+--- a/lib/widgets/file_actions.dart
++++ b/lib/widgets/file_actions.dart
+@@ -10,6 +10,7 @@ import '../services/download_service.dart';
+ import '../services/native_downloads.dart';
+ import '../services/pixeldrain_bypass.dart';
+ import '../theme/app_theme.dart';
++import '../utils/errors.dart';
+ import '../utils/file_types.dart';
+ import 'kit.dart';
+ import 'motion.dart';
+@@ -73,9 +74,7 @@ Future<void> downloadItem(
+   if (task.status == DownloadStatus.error) {
+     text = s.downloadFailedSnack(
+       task.name,
+-      task.error == 'storage_permission'
+-          ? s.storagePermission
+-          : (task.error ?? ''),
++      describeDownloadError(context, task.error),
+     );
+   } else if (!task.isActive && task.status == DownloadStatus.done) {
+     text = '${task.name} ${s.alreadyDownloaded}';
+@@ -85,7 +84,8 @@ Future<void> downloadItem(
+     text = s.downloadStartedSnack(task.name);
+   }
+ 
+-  final forbidden = task.error?.contains('403') ?? false;
++  final forbidden = (task.error?.contains('403') ?? false) ||
++      task.error == 'pixeldrain_rate_limited';
+   final fileId = (item.id ?? '').trim();
+ 
+   showAppSnack(
+diff --git a/lib/widgets/kit.dart b/lib/widgets/kit.dart
+index a594d90..b3a9dcb 100644
+--- a/lib/widgets/kit.dart
++++ b/lib/widgets/kit.dart
+@@ -408,41 +408,73 @@ class GlowIcon extends StatelessWidget {
+ }
+ 
+ /// Orb besar untuk empty state / onboarding.
+-class OrbIcon extends StatelessWidget {
++class OrbIcon extends StatefulWidget {
+   const OrbIcon({
+     super.key,
+     required this.icon,
+     this.size = 96,
+     this.color,
+     this.iconSize,
++    this.animate = true,
+   });
+ 
+   final IconData icon;
+   final double size;
+   final Color? color;
+   final double? iconSize;
++  final bool animate;
++
++  @override
++  State<OrbIcon> createState() => _OrbIconState();
++}
++
++class _OrbIconState extends State<OrbIcon>
++    with SingleTickerProviderStateMixin {
++  late final AnimationController _c = AnimationController(
++    vsync: this,
++    duration: const Duration(milliseconds: 2600),
++  );
++
++  @override
++  void initState() {
++    super.initState();
++    if (widget.animate) _c.repeat(reverse: true);
++  }
++
++  @override
++  void dispose() {
++    _c.dispose();
++    super.dispose();
++  }
+ 
+   @override
+   Widget build(BuildContext context) {
+-    final scheme = AppColors.scheme;
+-    final tint = color ?? scheme.primary;
++    final tint = widget.color ?? AppColors.scheme.primary;
++    final size = widget.size;
+ 
+     return SizedBox(
+       width: size,
+       height: size,
+       child: Center(
+-        child: Container(
+-          width: size * 0.78,
+-          height: size * 0.78,
+-          decoration: BoxDecoration(
+-            shape: BoxShape.circle,
+-            color: tint.withValues(alpha: 0.14),
++        child: AnimatedBuilder(
++          animation: _c,
++          builder: (context, child) => Transform.scale(
++            scale: 1 + 0.035 * Curves.easeInOut.transform(_c.value),
++            child: child,
+           ),
+-          child: Center(
+-            child: Icon(
+-              icon,
+-              size: iconSize ?? size * 0.34,
+-              color: tint,
++          child: Container(
++            width: size * 0.78,
++            height: size * 0.78,
++            decoration: BoxDecoration(
++              shape: BoxShape.circle,
++              color: tint.withValues(alpha: 0.14),
++            ),
++            child: Center(
++              child: Icon(
++                widget.icon,
++                size: widget.iconSize ?? size * 0.34,
++                color: tint,
++              ),
+             ),
+           ),
+         ),
+diff --git a/lib/widgets/motion.dart b/lib/widgets/motion.dart
+index 3d452d2..2cb7ae3 100644
+--- a/lib/widgets/motion.dart
++++ b/lib/widgets/motion.dart
+@@ -258,11 +258,13 @@ class _AnimatedIndexedStackState extends State<AnimatedIndexedStack>
+     value: 1,
+   );
+   late int _current = widget.index;
++  double _direction = 1;
+ 
+   @override
+   void didUpdateWidget(covariant AnimatedIndexedStack old) {
+     super.didUpdateWidget(old);
+     if (widget.index != _current) {
++      _direction = widget.index > _current ? 1 : -1;
+       _current = widget.index;
+       _c.forward(from: 0);
+     }
+@@ -292,7 +294,7 @@ class _AnimatedIndexedStackState extends State<AnimatedIndexedStack>
+                   child: Transform.scale(
+                     scale: 0.985 + 0.015 * t,
+                     child: Transform.translate(
+-                      offset: Offset(0, (1 - t) * 8),
++                      offset: Offset((1 - t) * 14 * _direction, 0),
+                       child: child,
+                     ),
+                   ),
+diff --git a/lib/widgets/transfers_sheet.dart b/lib/widgets/transfers_sheet.dart
+index 4bbc1c8..dc1e31b 100644
+--- a/lib/widgets/transfers_sheet.dart
++++ b/lib/widgets/transfers_sheet.dart
+@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
+ import '../controllers/drive_controller.dart';
+ import '../l10n/app_strings.dart';
+ import '../l10n/locale_controller.dart';
++import '../utils/errors.dart';
+ import '../screens/settings_screen.dart';
+ import '../services/download_service.dart';
+ import '../services/native_downloads.dart';
+@@ -363,9 +364,10 @@ class _DownloadsTab extends StatelessWidget {
+                         ),
+                         const SizedBox(height: 3),
+                         Text(
+-                          task.error == 'storage_permission'
+-                              ? s.storagePermission
+-                              : (task.error ?? s.downloadDetails),
++                          describeDownloadError(
++                            context,
++                            task.error ?? s.downloadDetails,
++                          ),
+                           maxLines: 2,
+                           overflow: TextOverflow.ellipsis,
+                           style: TextStyle(
+@@ -430,7 +432,7 @@ class _DownloadsTab extends StatelessWidget {
+     }
+   }
+ 
+-  String _subtitle(AppStrings s, DownloadTask t) {
++  String _subtitle(BuildContext context, AppStrings s, DownloadTask t) {
+     switch (t.status) {
+       case DownloadStatus.preparing:
+         return s.preparingLink;
+@@ -448,7 +450,9 @@ class _DownloadsTab extends StatelessWidget {
+         return s.canceled;
+       case DownloadStatus.error:
+         return s.failedDetail(
+-          t.error == 'storage_permission' ? s.storagePermission : (t.error ?? '—'),
++          describeDownloadError(context, t.error).isEmpty
++              ? '—'
++              : describeDownloadError(context, t.error),
+         );
+     }
+   }
+@@ -498,7 +502,7 @@ class _DownloadsTab extends StatelessWidget {
+           title: t.name,
+           progress: t.status == DownloadStatus.downloading ? t.progress : null,
+           subtitle: Text(
+-            _subtitle(s, t),
++            _subtitle(context, s, t),
+             maxLines: 2,
+             overflow: TextOverflow.ellipsis,
+             style: TextStyle(
+diff --git a/pubspec.yaml b/pubspec.yaml
+index d34124b..267e830 100644
+--- a/pubspec.yaml
++++ b/pubspec.yaml
+@@ -1,7 +1,7 @@
+ name: dropify
+ description: A Pixeldrain Client.
+ publish_to: 'none'
+-version: 1.1.0+2
++version: 1.2.0+3
+ 
+ environment:
+   sdk: '>=3.0.0 <4.0.0'
+-- 
+2.34.1
+

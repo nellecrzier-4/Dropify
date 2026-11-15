@@ -1,0 +1,570 @@
+From fc8b04da1d5d87fad82ac428e5011e19b4a94757 Mon Sep 17 00:00:00 2001
+From: design-bot <design@local>
+Date: Sun, 15 Nov 2026 06:25:14 +0000
+Subject: [PATCH] =?UTF-8?q?release:=20v1.4.1=20(versionCode=206)=20?=
+ =?UTF-8?q?=E2=80=94=20padding=20sheet?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ lib/screens/files_tab.dart    |   2 +-
+ lib/screens/home_screen.dart  |   4 +-
+ lib/screens/home_tab.dart     |   2 +-
+ lib/screens/photos_tab.dart   |   2 +-
+ lib/screens/start_screen.dart |  87 +++++++++---
+ lib/widgets/kit.dart          | 249 ++++++++++++++++++----------------
+ lib/widgets/motion.dart       |  13 +-
+ lib/widgets/storage_card.dart |  13 +-
+ pubspec.yaml                  |   2 +-
+ 9 files changed, 232 insertions(+), 142 deletions(-)
+
+diff --git a/lib/screens/files_tab.dart b/lib/screens/files_tab.dart
+index ec5af6c..5c059ed 100644
+--- a/lib/screens/files_tab.dart
++++ b/lib/screens/files_tab.dart
+@@ -304,7 +304,7 @@ class _FolderViewState extends State<FolderView> {
+               },
+               child: ListView(
+                 physics: const AlwaysScrollableScrollPhysics(),
+-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 110),
++                padding: const EdgeInsets.fromLTRB(16, 4, 16, 140),
+                 children: [
+                   if (widget.root)
+                     Stagger(
+diff --git a/lib/screens/home_screen.dart b/lib/screens/home_screen.dart
+index 4ef3607..b2539ec 100644
+--- a/lib/screens/home_screen.dart
++++ b/lib/screens/home_screen.dart
+@@ -142,7 +142,7 @@ class _HomeScreenState extends State<HomeScreen> {
+             bottom: 0,
+             child: SafeArea(
+               top: false,
+-              minimum: const EdgeInsets.only(bottom: 8),
++              minimum: const EdgeInsets.only(bottom: 12),
+               child: Padding(
+                 padding: const EdgeInsets.symmetric(horizontal: 20),
+                 child: GlassNav(
+@@ -175,7 +175,7 @@ class _HomeScreenState extends State<HomeScreen> {
+           ),
+           Positioned(
+             right: 20,
+-            bottom: 92 + safeBottom,
++            bottom: 118 + safeBottom,
+             child: _AddFab(onTap: _showAddMenu, open: _addOpen),
+           ),
+         ],
+diff --git a/lib/screens/home_tab.dart b/lib/screens/home_tab.dart
+index 9e693f4..7c72250 100644
+--- a/lib/screens/home_tab.dart
++++ b/lib/screens/home_tab.dart
+@@ -39,7 +39,7 @@ class HomeTab extends StatelessWidget {
+             onRefresh: ctrl.refresh,
+             child: ListView(
+               physics: const AlwaysScrollableScrollPhysics(),
+-              padding: const EdgeInsets.fromLTRB(18, 8, 18, 110),
++              padding: const EdgeInsets.fromLTRB(18, 8, 18, 140),
+               children: [
+                 stagger(
+                   _Header(
+diff --git a/lib/screens/photos_tab.dart b/lib/screens/photos_tab.dart
+index 138258d..9eb5d77 100644
+--- a/lib/screens/photos_tab.dart
++++ b/lib/screens/photos_tab.dart
+@@ -74,7 +74,7 @@ class PhotosTab extends StatelessWidget {
+                         ? ListView(
+                             key: const ValueKey('empty'),
+                             physics: const AlwaysScrollableScrollPhysics(),
+-                            padding: const EdgeInsets.fromLTRB(20, 8, 20, 110),
++                            padding: const EdgeInsets.fromLTRB(20, 8, 20, 140),
+                             children: [const _EmptyPhotos()],
+                           )
+                         : GridView.builder(
+diff --git a/lib/screens/start_screen.dart b/lib/screens/start_screen.dart
+index e4b31c9..b83d62d 100644
+--- a/lib/screens/start_screen.dart
++++ b/lib/screens/start_screen.dart
+@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
+ import '../theme/app_theme.dart';
+ import '../widgets/anim.dart';
+ import '../widgets/kit.dart';
++import '../widgets/motion.dart';
+ import '../widgets/wave_progress.dart';
+ import 'login_screen.dart';
+ import 'setup_screen.dart';
+@@ -54,39 +55,89 @@ class _StartScreenState extends State<StartScreen> {
+   }
+ }
+ 
+-class _BootSplash extends StatelessWidget {
++class _BootSplash extends StatefulWidget {
+   const _BootSplash({super.key});
+ 
++  @override
++  State<_BootSplash> createState() => _BootSplashState();
++}
++
++class _BootSplashState extends State<_BootSplash>
++    with SingleTickerProviderStateMixin {
++  late final AnimationController _c = AnimationController(
++    vsync: this,
++    duration: const Duration(milliseconds: 900),
++  )..forward();
++
++  @override
++  void dispose() {
++    _c.dispose();
++    super.dispose();
++  }
++
+   @override
+   Widget build(BuildContext context) {
++    final mark = CurvedAnimation(
++      parent: _c,
++      curve: const Interval(0, 0.65, curve: Motion.spring),
++    );
++    final text = CurvedAnimation(
++      parent: _c,
++      curve: const Interval(0.35, 1, curve: Motion.emphasized),
++    );
++
+     return Scaffold(
+       body: OrbBackground(
+         child: Center(
+           child: Column(
+             mainAxisSize: MainAxisSize.min,
+             children: [
+-              const Breathing(child: OrbIcon(icon: Icons.cloud_rounded, size: 124)),
+-              const SizedBox(height: 30),
+-              Text(
+-                'Dropify',
+-                style: TextStyle(
+-                  color: AppColors.text,
+-                  fontSize: 24,
+-                  fontWeight: FontWeight.w700,
+-                  letterSpacing: -0.4,
++              AnimatedBuilder(
++                animation: mark,
++                builder: (context, child) => Transform.scale(
++                  scale: 0.55 + 0.45 * mark.value.clamp(0.0, 1.2),
++                  child: Opacity(
++                    opacity: mark.value.clamp(0.0, 1.0),
++                    child: child,
++                  ),
+                 ),
++                child: const OrbIcon(icon: Icons.cloud_rounded, size: 124),
+               ),
+               const SizedBox(height: 26),
+-              SizedBox(
+-                width: 150,
+-                child: ClipRRect(
+-                  borderRadius: BorderRadius.circular(AppRadii.pill),
+-                  child: const WaveProgressBar(
+-                    value: 0,
+-                    indeterminate: true,
+-                    height: 5,
++              AnimatedBuilder(
++                animation: text,
++                builder: (context, child) => Opacity(
++                  opacity: text.value.clamp(0.0, 1.0),
++                  child: Transform.translate(
++                    offset: Offset(0, (1 - text.value) * 10),
++                    child: child,
+                   ),
+                 ),
++                child: Column(
++                  children: [
++                    Text(
++                      'Dropify',
++                      style: TextStyle(
++                        color: AppColors.text,
++                        fontSize: 25,
++                        fontWeight: FontWeight.w600,
++                        letterSpacing: -0.3,
++                      ),
++                    ),
++                    const SizedBox(height: 18),
++                    SizedBox(
++                      width: 132,
++                      child: ClipRRect(
++                        borderRadius: BorderRadius.circular(AppRadii.pill),
++                        child: const WaveProgressBar(
++                          value: 0,
++                          indeterminate: true,
++                          height: 5,
++                        ),
++                      ),
++                    ),
++                  ],
++                ),
+               ),
+             ],
+           ),
+diff --git a/lib/widgets/kit.dart b/lib/widgets/kit.dart
+index b3a9dcb..bee6b7c 100644
+--- a/lib/widgets/kit.dart
++++ b/lib/widgets/kit.dart
+@@ -795,106 +795,156 @@ class GlassNav extends StatelessWidget {
+   final ValueChanged<int> onTap;
+   final Widget? trailing;
+ 
++  static const double _barHeight = 62;
++  static const double _bubble = 62;
++  static const double _lift = 31; // setengah lingkaran menonjol di atas bar
++
+   @override
+   Widget build(BuildContext context) {
+     final scheme = AppColors.scheme;
+-    const barHeight = 56.0;
+-    const pad = 8.0;
+-
+-    return Container(
+-      decoration: BoxDecoration(
+-        borderRadius: BorderRadius.circular(AppRadii.pill),
+-        boxShadow: AppColors.shadowMd,
+-      ),
+-      child: ClipRRect(
+-        borderRadius: BorderRadius.circular(AppRadii.pill),
+-        child: BackdropFilter(
+-          filter: ui.ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+-          child: Container(
+-            padding: const EdgeInsets.all(pad),
+-            decoration: BoxDecoration(
+-              color: scheme.surfaceContainerHigh.withValues(
+-                alpha: AppColors.isDark ? 0.80 : 0.86,
+-              ),
+-              borderRadius: BorderRadius.circular(AppRadii.pill),
+-              border: Border.all(
+-                color: scheme.outlineVariant.withValues(alpha: 0.5),
+-                width: 0.6,
++    final dark = AppColors.isDark;
++    // Dock selalu gelap (seperti referensi); di tema gelap pakai surface tinggi.
++    final barColor =
++        dark ? scheme.surfaceContainerHighest : const Color(0xFF14131A);
++
++    return LayoutBuilder(
++      builder: (context, constraints) {
++        final width = constraints.maxWidth;
++        final segment = width / items.length;
++        final center = (index + 0.5) * segment;
++
++        return SizedBox(
++          width: width,
++          height: _barHeight + _lift,
++          child: Stack(
++            clipBehavior: Clip.none,
++            children: [
++              Positioned.fill(
++                child: CustomPaint(
++                  painter: _DockPainter(
++                    color: barColor,
++                    // semua posisi tab: lingkaran digambar hanya di tab aktif
++                    centers: [
++                      for (var i = 0; i < items.length; i++)
++                        ((i + 0.5) * segment, i == index),
++                    ],
++                  ),
++                ),
+               ),
+-            ),
+-            child: LayoutBuilder(
+-              builder: (context, constraints) {
+-                final trailingWidth = trailing == null ? 0.0 : 56.0;
+-                final usable = constraints.maxWidth - trailingWidth;
+-                final segment = usable / items.length;
+-
+-                return SizedBox(
+-                  height: barHeight,
+-                  child: Stack(
+-                    children: [
+-                      // Indikator seleksi: lebar TETAP per segmen, hanya
+-                      // digeser — jadi bar tidak pernah berubah ukuran /
+-                      // bergoyang saat pindah tab.
+-                      AnimatedPositioned(
+-                        duration: Motion.slow,
+-                        curve: Motion.spring,
+-                        left: segment * index + 2,
+-                        top: 0,
+-                        bottom: 0,
+-                        width: segment - 4,
+-                        child: DecoratedBox(
+-                          decoration: BoxDecoration(
+-                            color: scheme.secondaryContainer,
+-                            borderRadius:
+-                                BorderRadius.circular(AppRadii.pill),
+-                          ),
++              // Ikon di dalam bar.
++              Positioned(
++                left: 0,
++                right: 0,
++                top: _lift,
++                height: _barHeight,
++                child: Row(
++                  children: [
++                    for (var i = 0; i < items.length; i++)
++                      Expanded(
++                        child: _DockItem(
++                          item: items[i],
++                          selected: i == index,
++                          accent: scheme.primaryContainer,
++                          onTap: () => onTap(i),
+                         ),
+                       ),
+-                      Row(
+-                        children: [
+-                          for (var i = 0; i < items.length; i++)
+-                            SizedBox(
+-                              width: segment,
+-                              child: _NavItem(
+-                                item: items[i],
+-                                selected: i == index,
+-                                onTap: () => onTap(i),
+-                              ),
+-                            ),
+-                          if (trailing != null)
+-                            SizedBox(
+-                              width: trailingWidth,
+-                              child: Center(child: trailing),
+-                            ),
+-                        ],
+-                      ),
+-                    ],
++                  ],
++                ),
++              ),
++              // Ikon tab aktif di dalam lingkaran.
++              AnimatedPositioned(
++                duration: Motion.slow,
++                curve: Motion.spring,
++                left: center - _bubble / 2,
++                top: 0,
++                width: _bubble,
++                height: _bubble,
++                child: IgnorePointer(
++                  child: Center(
++                    child: Icon(
++                      items[index].activeIcon ?? items[index].icon,
++                      size: 26,
++                      color: Colors.white,
++                    ),
+                   ),
+-                );
+-              },
+-            ),
++                ),
++              ),
++            ],
+           ),
+-        ),
+-      ),
++        );
++      },
+     );
+   }
+ }
+ 
+-class _NavItem extends StatelessWidget {
+-  const _NavItem({
++/// Bar dock dengan tonjolan lingkaran pada tab aktif.
++class _DockPainter extends CustomPainter {
++  _DockPainter({required this.color, required this.centers});
++
++  final Color color;
++  final List<(double, bool)> centers;
++
++  @override
++  void paint(Canvas canvas, Size size) {
++    final barTop = size.height - GlassNav._barHeight;
++    final radius = GlassNav._barHeight / 2;
++    var path = Path()
++      ..addRRect(
++        RRect.fromRectAndRadius(
++          Rect.fromLTWH(0, barTop, size.width, GlassNav._barHeight),
++          Radius.circular(radius),
++        ),
++      );
++
++    for (final (cx, active) in centers) {
++      if (!active) continue;
++      final bubble = Path()
++        ..addOval(
++          Rect.fromCircle(
++            center: Offset(cx, barTop),
++            radius: GlassNav._bubble / 2,
++          ),
++        );
++      path = Path.combine(PathOperation.union, path, bubble);
++    }
++
++    canvas.saveLayer(Offset.zero & size, Paint());
++    canvas.drawPath(path, Paint()..color = color);
++    // Fillet: potong sedikit di kedua sisi tonjolan supaya lekukannya halus.
++    final cut = Paint()..blendMode = BlendMode.clear;
++    for (final (cx, active) in centers) {
++      if (!active) continue;
++      for (final dx in [-1, 1]) {
++        canvas.drawCircle(
++          Offset(cx + dx * (GlassNav._bubble / 2 + 6), barTop - 2),
++          10,
++          cut,
++        );
++      }
++    }
++    canvas.restore();
++  }
++
++  @override
++  bool shouldRepaint(covariant _DockPainter old) =>
++      old.color != color || old.centers != centers;
++}
++
++class _DockItem extends StatelessWidget {
++  const _DockItem({
+     required this.item,
+     required this.selected,
++    required this.accent,
+     required this.onTap,
+   });
+ 
+   final GlassNavItem item;
+   final bool selected;
++  final Color accent;
+   final VoidCallback onTap;
+ 
+   @override
+   Widget build(BuildContext context) {
+-    final scheme = AppColors.scheme;
+-
+     return GestureDetector(
+       behavior: HitTestBehavior.opaque,
+       onTap: () {
+@@ -902,43 +952,14 @@ class _NavItem extends StatelessWidget {
+         onTap();
+       },
+       child: Center(
+-        child: ClipRect(
+-          child: Row(
+-            mainAxisSize: MainAxisSize.min,
+-            children: [
+-              AnimatedScale(
+-                scale: selected ? 1 : 0.94,
+-                duration: Motion.base,
+-                curve: Motion.spring,
+-                child: Icon(
+-                  selected ? (item.activeIcon ?? item.icon) : item.icon,
+-                  size: 22,
+-                  color: selected
+-                      ? scheme.onSecondaryContainer
+-                      : scheme.onSurfaceVariant,
+-                ),
+-              ),
+-              AnimatedSize(
+-                duration: Motion.slow,
+-                curve: Motion.spring,
+-                alignment: Alignment.centerLeft,
+-                child: selected
+-                    ? Padding(
+-                        padding: const EdgeInsets.only(left: 8),
+-                        child: Text(
+-                          item.label,
+-                          maxLines: 1,
+-                          overflow: TextOverflow.ellipsis,
+-                          style: TextStyle(
+-                            color: scheme.onSecondaryContainer,
+-                            fontSize: 13,
+-                            fontWeight: FontWeight.w600,
+-                          ),
+-                        ),
+-                      )
+-                    : const SizedBox(width: 0, height: 0),
+-              ),
+-            ],
++        child: AnimatedScale(
++          scale: selected ? 0 : 1,
++          duration: Motion.base,
++          curve: Motion.spring,
++          child: Icon(
++            item.icon,
++            size: 25,
++            color: Colors.white.withValues(alpha: 0.72),
+           ),
+         ),
+       ),
+diff --git a/lib/widgets/motion.dart b/lib/widgets/motion.dart
+index 0e19ad0..bfdca13 100644
+--- a/lib/widgets/motion.dart
++++ b/lib/widgets/motion.dart
+@@ -681,7 +681,7 @@ class _SheetPageState extends State<_SheetPage> {
+         child: Opacity(
+           opacity: (1 - _drag / 400).clamp(0.4, 1.0),
+           child: Padding(
+-      padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
++      padding: const EdgeInsets.fromLTRB(10, 0, 10, 12),
+       child: Material(
+         color: Theme.of(context).colorScheme.surfaceContainerLow,
+         clipBehavior: Clip.antiAlias,
+@@ -689,7 +689,16 @@ class _SheetPageState extends State<_SheetPage> {
+           borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+         ),
+         child: useSafeArea
+-            ? SafeArea(top: false, child: builder(context))
++            // Ruang ekstra di bawah supaya baris terakhir tidak menempel ke
++            // gesture bar / tepi layar.
++            ? SafeArea(
++                top: false,
++                minimum: const EdgeInsets.only(bottom: 10),
++                child: Padding(
++                  padding: const EdgeInsets.only(bottom: 6),
++                  child: builder(context),
++                ),
++              )
+             : builder(context),
+       ),
+         ),
+diff --git a/lib/widgets/storage_card.dart b/lib/widgets/storage_card.dart
+index 7602f39..4493e20 100644
+--- a/lib/widgets/storage_card.dart
++++ b/lib/widgets/storage_card.dart
+@@ -96,7 +96,11 @@ class StorageCard extends StatelessWidget {
+                     ),
+                   ),
+                   const SizedBox(height: 18),
+-                  _SegmentBar(stats: visible, total: total),
++                  _SegmentBar(
++                    stats: visible,
++                    total: total,
++                    onTap: onTotalTap,
++                  ),
+                 ],
+               ),
+             ),
+@@ -197,7 +201,12 @@ Color barColor(Color c) => Color.lerp(
+ class _SegmentBar extends StatelessWidget {
+   final List<_Stat> stats;
+   final int total;
+-  const _SegmentBar({required this.stats, required this.total});
++  final VoidCallback onTap;
++  const _SegmentBar({
++    required this.stats,
++    required this.total,
++    required this.onTap,
++  });
+ 
+   @override
+   Widget build(BuildContext context) {
+diff --git a/pubspec.yaml b/pubspec.yaml
+index 689393c..55c619c 100644
+--- a/pubspec.yaml
++++ b/pubspec.yaml
+@@ -1,7 +1,7 @@
+ name: dropify
+ description: A Pixeldrain Client.
+ publish_to: 'none'
+-version: 1.3.0+4
++version: 1.4.1+6
+ 
+ environment:
+   sdk: '>=3.0.0 <4.0.0'
+-- 
+2.34.1
+

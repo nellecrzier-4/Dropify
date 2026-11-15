@@ -1,0 +1,2100 @@
+From 6be3c5521e47719a7b591414a8ce4ebecbbb594f Mon Sep 17 00:00:00 2001
+From: design-bot <design@local>
+Date: Sun, 15 Nov 2026 06:01:44 +0000
+Subject: [PATCH] =?UTF-8?q?release:=20v1.3.0=20(versionCode=204)=20?=
+ =?UTF-8?q?=E2=80=94=20i18n=20lengkap=20+=20popup=20variatif?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ lib/controllers/drive_controller.dart |  11 +-
+ lib/l10n/app_strings.dart             | 469 +++++++++++++++++++++++---
+ lib/l10n/locale_controller.dart       |   7 +
+ lib/screens/file_list_screen.dart     |   2 +-
+ lib/screens/home_tab.dart             |   4 +-
+ lib/screens/join_parts_screen.dart    |   6 +-
+ lib/screens/login_screen.dart         |   2 +-
+ lib/screens/settings_screen.dart      |   8 +-
+ lib/screens/setup_screen.dart         |  10 +-
+ lib/services/download_service.dart    |  44 +--
+ lib/services/native_downloads.dart    |  13 +-
+ lib/services/pixeldrain_api.dart      |  40 +--
+ lib/services/transfer_session.dart    |   4 +-
+ lib/utils/file_types.dart             |  52 +--
+ lib/widgets/file_actions.dart         |  89 ++---
+ lib/widgets/file_tile.dart            |  19 +-
+ lib/widgets/link_download_sheet.dart  |   2 +-
+ lib/widgets/motion.dart               | 416 ++++++++++++++++++++---
+ lib/widgets/storage_card.dart         |   2 +-
+ lib/widgets/sync_card.dart            |   2 +-
+ lib/widgets/transfers_sheet.dart      | 161 +++++----
+ pubspec.yaml                          |   2 +-
+ 22 files changed, 1073 insertions(+), 292 deletions(-)
+
+diff --git a/lib/controllers/drive_controller.dart b/lib/controllers/drive_controller.dart
+index fc7f44f..19c0ec8 100644
+--- a/lib/controllers/drive_controller.dart
++++ b/lib/controllers/drive_controller.dart
+@@ -4,6 +4,8 @@ import 'dart:math' as math;
+ import 'package:file_picker/file_picker.dart';
+ import 'package:flutter/foundation.dart';
+ 
++import '../l10n/app_strings.dart';
++import '../l10n/locale_controller.dart';
+ import '../models/pd_item.dart';
+ import '../services/download_service.dart';
+ import '../services/pixeldrain_api.dart';
+@@ -34,6 +36,9 @@ class DriveController extends ChangeNotifier {
+ 
+   final PixeldrainApi api;
+ 
++  /// Teks sesuai bahasa aktif (tanpa BuildContext).
++  AppStrings get _s => LocaleController.instance.strings;
++
+   /// Manajer download (link bypass + progres unduhan).
+   final DownloadService downloads;
+ 
+@@ -189,7 +194,7 @@ class DriveController extends ChangeNotifier {
+ 
+   /// Ganti nama file/folder filesystem.
+   Future<String?> renameFsItem(PdItem item, String newName) async {
+-    if (item.fsPath.isEmpty) return 'Item ini tidak bisa diganti nama.';
++    if (item.fsPath.isEmpty) return _s.itemCannotRename;
+     try {
+       await api.rename(item.fsPath, newName);
+       return null;
+@@ -200,7 +205,7 @@ class DriveController extends ChangeNotifier {
+ 
+   /// Hapus file/folder filesystem.
+   Future<String?> deleteFsItem(PdItem item) async {
+-    if (item.fsPath.isEmpty) return 'Item ini tidak bisa dihapus.';
++    if (item.fsPath.isEmpty) return _s.itemCannotDelete;
+     try {
+       await api.deleteFs(item.fsPath, recursive: item.isDir);
+       return null;
+@@ -227,7 +232,7 @@ class DriveController extends ChangeNotifier {
+ 
+   Future<String?> deleteItem(PdItem item) async {
+     final id = item.id;
+-    if (id == null) return 'File ini tidak bisa dihapus dari sini.';
++    if (id == null) return _s.fileCannotDeleteHere;
+     try {
+       await api.deleteFile(id);
+       files = files.where((f) => f.id != id).toList();
+diff --git a/lib/l10n/app_strings.dart b/lib/l10n/app_strings.dart
+index 3d41569..2d42fb3 100644
+--- a/lib/l10n/app_strings.dart
++++ b/lib/l10n/app_strings.dart
+@@ -48,8 +48,8 @@ abstract class AppStrings {
+   String get recent;
+   String get logout;
+   String get language;
+-  String get followSystem;
+-  String get english;
++  String get languageFollowSystem;
++  String get languageEnglish;
+   String get languageSubtitle;
+   String get settings;
+   String get appearance;
+@@ -118,10 +118,7 @@ abstract class AppStrings {
+   String get noPartsFound;
+   String get parts;
+   String get merge;
+-  String get joined;
+-  String get joinFailed;
+   String get joinOverwriteTitle;
+-  String get joinOverwriteBody;
+   String get clearCache;
+   String get cacheCleared;
+   String get canceled;
+@@ -194,6 +191,71 @@ abstract class AppStrings {
+   String get alreadyDownloaded;
+   String downloadingSnack(String name);
+   String downloadStartedSnack(String name);
++
++  // --- Sapuan teks tersisa (label, dialog, snackbar, error) ---
++  String get folder;
++  String get itemCannotRename;
++  String get itemCannotDelete;
++  String get fileCannotDeleteHere;
++  String get sortAscending;
++  String get sortDescending;
++  String get switchLanguage;
++  String connectionsBadge(int count);
++  String get liveBadge;
++  String get speedLabel;
++  String get timeLeftLabel;
++
++  // Label waktu relatif (dulu English-only di formatAgo)
++  String get justNow;
++  String secondsAgo(int seconds);
++  String minutesAgo(int minutes);
++  String hoursAgo(int hours);
++  String daysAgo(int days);
++
++  // Kategori file (dulu English-only di file_types)
++  String get categoryArchives;
++  String get categoryVideos;
++  String get categoryApps;
++  String get categoryImages;
++  String get categoryAudio;
++  String get categoryDocuments;
++  String get categoryOther;
++  String countFiles(int count);
++  String countVideos(int count);
++  String countApps(int count);
++  String countPhotos(int count);
++  String countTracks(int count);
++  String countDocuments(int count);
++
++  // Gabung bagian
++  String joinOverwriteBody(String name);
++  String joinSucceeded(String name);
++  String joinFailedDetail(String error);
++
++  // Pesan dari service (API, downloader, notifikasi transfer)
++  String get sessionExpired;
++  String connectionFailed(String detail);
++  String loginFailedHttp(int code);
++  String get downloadFailed;
++  String get fileNotFoundOnPixeldrain;
++  String get downloadBlocked;
++  String get downloadDenied;
++  String get serverRateLimited;
++  String serverError(int code);
++  String get connectionTimeout;
++  String get noInternet;
++  String get fileAccessRequired;
++  String get transferRunning;
++  String get browser;
++  String get probeUnreachable;
++  String get probeFailed;
++  String get connectionDropped;
++  String sizeMismatch(int received, int expected);
++  String get chunkIncomplete;
++  String get invalidRange;
++  String get downloaderNotResponding;
++  String get downloadStartFailed;
++  String get downloaderUnavailable;
+ }
+ 
+ class StringsId extends AppStrings {
+@@ -326,10 +388,10 @@ class StringsId extends AppStrings {
+   String get language => 'Bahasa';
+ 
+   @override
+-  String get followSystem => 'Ikuti sistem';
++  String get languageFollowSystem => 'Ikuti sistem';
+ 
+   @override
+-  String get english => 'English';
++  String get languageEnglish => 'English';
+ 
+   @override
+   String get languageSubtitle => 'Hanya English yang tersedia selain sistem.';
+@@ -529,18 +591,9 @@ class StringsId extends AppStrings {
+   @override
+   String get merge => 'Gabung';
+ 
+-  @override
+-  String get joined => 'Selesai digabung:';
+-
+-  @override
+-  String get joinFailed => 'Gagal menggabung';
+-
+   @override
+   String get joinOverwriteTitle => 'File sudah ada';
+ 
+-  @override
+-  String get joinOverwriteBody => 'sudah ada. Timpa?';
+-
+   @override
+   String get clearCache => 'Bersihkan cache';
+ 
+@@ -757,6 +810,178 @@ class StringsId extends AppStrings {
+   @override
+   String downloadStartedSnack(String name) =>
+       'Mengunduh $name → Download/Dropify';
++
++  // --- Sapuan teks tersisa ---
++  @override
++  String get folder => 'Folder';
++
++  @override
++  String get itemCannotRename => 'Item ini tidak bisa diganti nama.';
++
++  @override
++  String get itemCannotDelete => 'Item ini tidak bisa dihapus.';
++
++  @override
++  String get fileCannotDeleteHere => 'File ini tidak bisa dihapus dari sini.';
++
++  @override
++  String get sortAscending => 'A → Z / kecil → besar';
++
++  @override
++  String get sortDescending => 'Z → A / besar → kecil';
++
++  @override
++  String get switchLanguage => 'English';
++
++  @override
++  String connectionsBadge(int count) => '$count koneksi';
++
++  @override
++  String get liveBadge => 'LIVE';
++
++  @override
++  String get speedLabel => 'Kecepatan';
++
++  @override
++  String get timeLeftLabel => 'Sisa waktu';
++
++  @override
++  String get justNow => 'baru saja';
++
++  @override
++  String secondsAgo(int seconds) => '$seconds dtk lalu';
++
++  @override
++  String minutesAgo(int minutes) => '$minutes mnt lalu';
++
++  @override
++  String hoursAgo(int hours) => '$hours jam lalu';
++
++  @override
++  String daysAgo(int days) => '$days hari lalu';
++
++  @override
++  String get categoryArchives => 'Arsip';
++
++  @override
++  String get categoryVideos => 'Video';
++
++  @override
++  String get categoryApps => 'Aplikasi';
++
++  @override
++  String get categoryImages => 'Gambar';
++
++  @override
++  String get categoryAudio => 'Audio';
++
++  @override
++  String get categoryDocuments => 'Dokumen';
++
++  @override
++  String get categoryOther => 'Lainnya';
++
++  @override
++  String countFiles(int count) => '$count file';
++
++  @override
++  String countVideos(int count) => '$count video';
++
++  @override
++  String countApps(int count) => '$count aplikasi';
++
++  @override
++  String countPhotos(int count) => '$count foto';
++
++  @override
++  String countTracks(int count) => '$count lagu';
++
++  @override
++  String countDocuments(int count) => '$count dokumen';
++
++  @override
++  String joinOverwriteBody(String name) =>
++      '$name sudah ada di Download/Dropify. Timpa?';
++
++  @override
++  String joinSucceeded(String name) => 'Selesai digabung: $name';
++
++  @override
++  String joinFailedDetail(String error) => 'Gagal menggabung: $error';
++
++  @override
++  String get sessionExpired => 'Sesi habis, silakan login ulang.';
++
++  @override
++  String connectionFailed(String detail) =>
++      'Gagal terhubung ke Pixeldrain: $detail';
++
++  @override
++  String loginFailedHttp(int code) => 'Login gagal (HTTP $code). Coba lagi.';
++
++  @override
++  String get downloadFailed => 'Download gagal.';
++
++  @override
++  String get fileNotFoundOnPixeldrain => 'File tidak ditemukan di Pixeldrain.';
++
++  @override
++  String get downloadBlocked =>
++      'Server menolak (HTTP 403) — biasanya batas unduhan Pixeldrain sudah '
++      'tercapai atau file dibatasi. Coba lagi nanti / buka di browser.';
++
++  @override
++  String get downloadDenied => 'Akses file ditolak (HTTP 401).';
++
++  @override
++  String get serverRateLimited => 'Server masih membatasi. Coba lagi nanti.';
++
++  @override
++  String serverError(int code) => 'Server download bermasalah (HTTP $code).';
++
++  @override
++  String get connectionTimeout => 'Koneksi timeout. Coba lagi.';
++
++  @override
++  String get noInternet => 'Tidak ada koneksi internet.';
++
++  @override
++  String get fileAccessRequired => 'Izin akses file diperlukan';
++
++  @override
++  String get transferRunning => 'Transfer berjalan';
++
++  @override
++  String get browser => 'Browser';
++
++  @override
++  String get probeUnreachable => 'tidak bisa diakses';
++
++  @override
++  String get probeFailed => 'gagal';
++
++  @override
++  String get connectionDropped => 'koneksi berhenti sebelum selesai';
++
++  @override
++  String sizeMismatch(int received, int expected) =>
++      'ukuran file tidak sesuai ($received/$expected byte)';
++
++  @override
++  String get chunkIncomplete => 'potongan belum selesai';
++
++  @override
++  String get invalidRange => 'rentang tidak valid';
++
++  @override
++  String get downloaderNotResponding => 'Downloader tidak merespons.';
++
++  @override
++  String get downloadStartFailed => 'Gagal memulai download.';
++
++  @override
++  String get downloaderUnavailable =>
++      'Downloader Android tidak tersedia di perangkat ini.';
+ }
+ 
+ class StringsEn extends AppStrings {
+@@ -889,10 +1114,10 @@ class StringsEn extends AppStrings {
+   String get language => 'Language';
+ 
+   @override
+-  String get followSystem => 'Follow system';
++  String get languageFollowSystem => 'Follow system';
+ 
+   @override
+-  String get english => 'English';
++  String get languageEnglish => 'English';
+ 
+   @override
+   String get languageSubtitle => 'English is the only extra language for now.';
+@@ -1066,49 +1291,39 @@ class StringsEn extends AppStrings {
+       '$sent / $total · $speed/s';
+ 
+   @override
+-  String partOf(int index, int total) => 'Bagian $index/$total';
++  String partOf(int index, int total) => 'Part $index/$total';
+ 
+   @override
+-  String get joinParts => 'Gabung bagian';
++  String get joinParts => 'Join parts';
+ 
+   @override
+   String get joinPartsHint =>
+-      'Gabungkan file multi-bagian (nama.part1, nama.part2, …) jadi satu file.';
++      'Combine multi-part files (name.part1, name.part2, …) into a single file.';
+ 
+   @override
+-  String get deletePartsAfter => 'Hapus bagian setelah digabung';
++  String get deletePartsAfter => 'Delete parts after joining';
+ 
+   @override
+   String get deletePartsHint =>
+-      'Menghemat ruang; file hasil gabungan tetap disimpan.';
++      'Saves space; the joined file is kept.';
+ 
+   @override
+-  String get noPartsFound =>
+-      'Tidak ada file multi-bagian di Download/Dropify.';
+-
+-  @override
+-  String get parts => 'bagian';
+-
+-  @override
+-  String get merge => 'Gabung';
+-
+-  @override
+-  String get joined => 'Selesai digabung:';
++  String get noPartsFound => 'No multi-part files in Download/Dropify.';
+ 
+   @override
+-  String get joinFailed => 'Gagal menggabung';
++  String get parts => 'parts';
+ 
+   @override
+-  String get joinOverwriteTitle => 'File sudah ada';
++  String get merge => 'Join';
+ 
+   @override
+-  String get joinOverwriteBody => 'sudah ada. Timpa?';
++  String get joinOverwriteTitle => 'File already exists';
+ 
+   @override
+-  String get clearCache => 'Bersihkan cache';
++  String get clearCache => 'Clear cache';
+ 
+   @override
+-  String get cacheCleared => 'Cache dibersihkan';
++  String get cacheCleared => 'Cache cleared';
+ 
+   @override
+   String get canceled => 'Canceled';
+@@ -1320,4 +1535,180 @@ class StringsEn extends AppStrings {
+   @override
+   String downloadStartedSnack(String name) =>
+       'Downloading $name → Download/Dropify';
++
++  // --- Remaining literal sweep ---
++  @override
++  String get folder => 'Folder';
++
++  @override
++  String get itemCannotRename => "This item can't be renamed.";
++
++  @override
++  String get itemCannotDelete => "This item can't be deleted.";
++
++  @override
++  String get fileCannotDeleteHere => "This file can't be deleted from here.";
++
++  @override
++  String get sortAscending => 'A → Z / small → large';
++
++  @override
++  String get sortDescending => 'Z → A / large → small';
++
++  @override
++  String get switchLanguage => 'Bahasa';
++
++  @override
++  String connectionsBadge(int count) =>
++      count == 1 ? '1 connection' : '$count connections';
++
++  @override
++  String get liveBadge => 'LIVE';
++
++  @override
++  String get speedLabel => 'Speed';
++
++  @override
++  String get timeLeftLabel => 'Time left';
++
++  @override
++  String get justNow => 'just now';
++
++  @override
++  String secondsAgo(int seconds) => '${seconds}s ago';
++
++  @override
++  String minutesAgo(int minutes) => '$minutes min ago';
++
++  @override
++  String hoursAgo(int hours) => '$hours h ago';
++
++  @override
++  String daysAgo(int days) => '$days d ago';
++
++  @override
++  String get categoryArchives => 'Archives';
++
++  @override
++  String get categoryVideos => 'Videos';
++
++  @override
++  String get categoryApps => 'Apps';
++
++  @override
++  String get categoryImages => 'Images';
++
++  @override
++  String get categoryAudio => 'Audio';
++
++  @override
++  String get categoryDocuments => 'Documents';
++
++  @override
++  String get categoryOther => 'Other';
++
++  @override
++  String countFiles(int count) => count == 1 ? '1 file' : '$count files';
++
++  @override
++  String countVideos(int count) => count == 1 ? '1 video' : '$count videos';
++
++  @override
++  String countApps(int count) => count == 1 ? '1 app' : '$count apps';
++
++  @override
++  String countPhotos(int count) => count == 1 ? '1 photo' : '$count photos';
++
++  @override
++  String countTracks(int count) => count == 1 ? '1 track' : '$count tracks';
++
++  @override
++  String countDocuments(int count) =>
++      count == 1 ? '1 document' : '$count documents';
++
++  @override
++  String joinOverwriteBody(String name) =>
++      '$name already exists in Download/Dropify. Overwrite?';
++
++  @override
++  String joinSucceeded(String name) => 'Joined: $name';
++
++  @override
++  String joinFailedDetail(String error) => 'Could not join: $error';
++
++  @override
++  String get sessionExpired => 'Your session expired. Sign in again.';
++
++  @override
++  String connectionFailed(String detail) =>
++      'Could not reach Pixeldrain: $detail';
++
++  @override
++  String loginFailedHttp(int code) => 'Sign-in failed (HTTP $code). Try again.';
++
++  @override
++  String get downloadFailed => 'Download failed.';
++
++  @override
++  String get fileNotFoundOnPixeldrain => 'File not found on Pixeldrain.';
++
++  @override
++  String get downloadBlocked =>
++      'The server refused (HTTP 403) — usually the Pixeldrain download limit '
++      'has been reached or the file is restricted. Try again later / open in '
++      'your browser.';
++
++  @override
++  String get downloadDenied => 'File access denied (HTTP 401).';
++
++  @override
++  String get serverRateLimited =>
++      'The server is still rate limiting. Try again later.';
++
++  @override
++  String serverError(int code) => 'Download server error (HTTP $code).';
++
++  @override
++  String get connectionTimeout => 'Connection timed out. Try again.';
++
++  @override
++  String get noInternet => 'No internet connection.';
++
++  @override
++  String get fileAccessRequired => 'File access permission required';
++
++  @override
++  String get transferRunning => 'Transferring';
++
++  @override
++  String get browser => 'Browser';
++
++  @override
++  String get probeUnreachable => 'unreachable';
++
++  @override
++  String get probeFailed => 'failed';
++
++  @override
++  String get connectionDropped => 'connection dropped before finishing';
++
++  @override
++  String sizeMismatch(int received, int expected) =>
++      'file size mismatch ($received/$expected bytes)';
++
++  @override
++  String get chunkIncomplete => 'chunk did not finish';
++
++  @override
++  String get invalidRange => 'invalid range';
++
++  @override
++  String get downloaderNotResponding => 'The downloader is not responding.';
++
++  @override
++  String get downloadStartFailed => 'Could not start the download.';
++
++  @override
++  String get downloaderUnavailable =>
++      'The Android downloader is not available on this device.';
+ }
+diff --git a/lib/l10n/locale_controller.dart b/lib/l10n/locale_controller.dart
+index 2237260..bc27f58 100644
+--- a/lib/l10n/locale_controller.dart
++++ b/lib/l10n/locale_controller.dart
+@@ -30,6 +30,13 @@ class LocaleController extends ChangeNotifier with WidgetsBindingObserver {
+   AppStrings get strings =>
+       locale.languageCode == 'id' ? const StringsId() : const StringsEn();
+ 
++  /// Bahasa perangkat, terlepas dari pilihan pengguna — dipakai sebagai
++  /// keterangan di opsi "Ikuti sistem".
++  AppStrings get deviceStrings =>
++      _deviceLocale.languageCode == 'id' ? const StringsId() : const StringsEn();
++
++  String get deviceLanguageName => deviceStrings.languageName;
++
+   Future<void> load() async {
+     _deviceLocale = PlatformDispatcher.instance.locale;
+     final prefs = await SharedPreferences.getInstance();
+diff --git a/lib/screens/file_list_screen.dart b/lib/screens/file_list_screen.dart
+index 5f3242b..bff193e 100644
+--- a/lib/screens/file_list_screen.dart
++++ b/lib/screens/file_list_screen.dart
+@@ -111,7 +111,7 @@ class _FileListScreenState extends State<FileListScreen> {
+                 child: const Icon(Icons.arrow_upward, size: 18),
+               ),
+               const SizedBox(width: 8),
+-              Text(_ascending ? 'A → Z / kecil → besar' : 'Z → A / besar → kecil'),
++              Text(_ascending ? s.sortAscending : s.sortDescending),
+             ],
+           ),
+         ),
+diff --git a/lib/screens/home_tab.dart b/lib/screens/home_tab.dart
+index 439fb3d..9e693f4 100644
+--- a/lib/screens/home_tab.dart
++++ b/lib/screens/home_tab.dart
+@@ -94,8 +94,8 @@ class HomeTab extends StatelessWidget {
+                     onCategoryTap: (c) => Navigator.push(
+                       context,
+                       SharedAxisPageRoute(
+-                        builder: (_) => FileListScreen(
+-                            ctrl: ctrl, title: c.label, category: c),
++                        builder: (_) =>
++                            FileListScreen(ctrl: ctrl, title: c.label(s), category: c),
+                       ),
+                     ),
+                   ),
+diff --git a/lib/screens/join_parts_screen.dart b/lib/screens/join_parts_screen.dart
+index 311d6cd..fdd8f7f 100644
+--- a/lib/screens/join_parts_screen.dart
++++ b/lib/screens/join_parts_screen.dart
+@@ -94,7 +94,7 @@ class _JoinPartsScreenState extends State<JoinPartsScreen> {
+           context: context,
+           builder: (d) => AlertDialog(
+             title: Text(s.joinOverwriteTitle),
+-            content: Text('${group.outputName} ${s.joinOverwriteBody}'),
++            content: Text(s.joinOverwriteBody(group.outputName)),
+             actions: [
+               TextButton(
+                 onPressed: () => Navigator.pop(d, false),
+@@ -144,12 +144,12 @@ class _JoinPartsScreenState extends State<JoinPartsScreen> {
+ 
+       NativeDownloads.scanFile(output.path);
+       if (!mounted) return;
+-      showAppSnack(context, '${s.joined} ${group.outputName}');
++      showAppSnack(context, s.joinSucceeded(group.outputName));
+       await _scan();
+     } catch (e) {
+       if (!mounted) return;
+       ScaffoldMessenger.of(context)
+-          .showSnackBar(SnackBar(content: Text('${s.joinFailed}: $e')));
++          .showSnackBar(SnackBar(content: Text(s.joinFailedDetail('$e'))));
+     } finally {
+       if (mounted) setState(() => _busy = false);
+     }
+diff --git a/lib/screens/login_screen.dart b/lib/screens/login_screen.dart
+index a90a7da..2771dbc 100644
+--- a/lib/screens/login_screen.dart
++++ b/lib/screens/login_screen.dart
+@@ -120,7 +120,7 @@ class _LoginScreenState extends State<LoginScreen> {
+                     onPressed: _toggleLanguage,
+                     icon: const Icon(Icons.translate_rounded, size: 17),
+                     label: Text(
+-                      s.languageCode == 'id' ? 'English' : 'Bahasa',
++                      s.switchLanguage,
+                       style: const TextStyle(
+                         fontWeight: FontWeight.w600,
+                         fontSize: 13,
+diff --git a/lib/screens/settings_screen.dart b/lib/screens/settings_screen.dart
+index 76dd463..e2e7beb 100644
+--- a/lib/screens/settings_screen.dart
++++ b/lib/screens/settings_screen.dart
+@@ -129,10 +129,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
+                             children: [
+                               _SettingRow(
+                                 icon: Icons.translate_rounded,
+-                                title: s.followSystem,
+-                                subtitle: locale.locale.languageCode == 'id'
+-                                    ? 'Bahasa Indonesia'
+-                                    : 'English',
++                                title: s.languageFollowSystem,
++                                subtitle: locale.deviceLanguageName,
+                                 selected: locale.mode == AppLanguage.system,
+                                 onTap: () =>
+                                     locale.setMode(AppLanguage.system),
+@@ -143,7 +141,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
+                               const _RowDivider(),
+                               _SettingRow(
+                                 icon: Icons.language_rounded,
+-                                title: s.english,
++                                title: s.languageEnglish,
+                                 selected: locale.mode == AppLanguage.english,
+                                 onTap: () =>
+                                     locale.setMode(AppLanguage.english),
+diff --git a/lib/screens/setup_screen.dart b/lib/screens/setup_screen.dart
+index ab4d850..aade2a6 100644
+--- a/lib/screens/setup_screen.dart
++++ b/lib/screens/setup_screen.dart
+@@ -380,7 +380,7 @@ class _SpeedArt extends StatelessWidget {
+               Icon(Icons.bolt_rounded, size: 18, color: const Color(0xFF9CCBFF)),
+               const SizedBox(width: 5),
+               Text(
+-                '8 connections',
++                context.s.connectionsBadge(8),
+                 style: TextStyle(
+                   color: Colors.white.withValues(alpha: 0.72),
+                   fontSize: 12,
+@@ -395,8 +395,8 @@ class _SpeedArt extends StatelessWidget {
+                   color: Colors.white.withValues(alpha: 0.14),
+                   borderRadius: BorderRadius.circular(AppRadii.pill),
+                 ),
+-                child: const Text(
+-                  'LIVE',
++                child: Text(
++                  context.s.liveBadge,
+                   style: TextStyle(
+                     color: Colors.white,
+                     fontSize: 9.5,
+@@ -486,7 +486,7 @@ class _ProgressArt extends StatelessWidget {
+                 child: StatRow(
+                   icon: Icons.speed_rounded,
+                   value: '12.4 MB/s',
+-                  label: 'Kecepatan',
++                  label: context.s.speedLabel,
+                 ),
+               ),
+               Container(
+@@ -499,7 +499,7 @@ class _ProgressArt extends StatelessWidget {
+                 child: StatRow(
+                   icon: Icons.timer_outlined,
+                   value: '00:12',
+-                  label: 'Sisa waktu',
++                  label: context.s.timeLeftLabel,
+                 ),
+               ),
+             ],
+diff --git a/lib/services/download_service.dart b/lib/services/download_service.dart
+index 887cda7..b60683f 100644
+--- a/lib/services/download_service.dart
++++ b/lib/services/download_service.dart
+@@ -5,6 +5,8 @@ import 'dart:typed_data';
+ import 'package:dio/dio.dart';
+ import 'package:flutter/foundation.dart';
+ 
++import '../l10n/app_strings.dart';
++import '../l10n/locale_controller.dart';
+ import '../models/pd_item.dart';
+ import '../utils/file_types.dart';
+ import 'app_settings.dart';
+@@ -354,7 +356,7 @@ class DownloadService extends ChangeNotifier {
+       }
+       task
+         ..status = DownloadStatus.error
+-        ..error = 'Link: ${probe.error ?? 'tidak bisa diakses'}'
++        ..error = 'Link: ${probe.error ?? _s.probeUnreachable}'
+         ..endedAt = DateTime.now();
+       _notify();
+       return;
+@@ -402,7 +404,7 @@ class DownloadService extends ChangeNotifier {
+         );
+         return;
+       }
+-      task.bypassError = last?.error ?? 'gagal';
++      task.bypassError = last?.error ?? _s.probeFailed;
+       if (task.bypassError == 'rate_limited') {
+         task
+           ..status = DownloadStatus.error
+@@ -429,7 +431,7 @@ class DownloadService extends ChangeNotifier {
+       return;
+     }
+ 
+-    final directError = directProbe.error ?? 'gagal';
++    final directError = directProbe.error ?? _s.probeFailed;
+     final rateLimited =
+         directError == 'rate_limited' || task.bypassError == 'rate_limited';
+     task
+@@ -545,7 +547,7 @@ class DownloadService extends ChangeNotifier {
+       title: task.name,
+       text: '',
+       progress: 0,
+-      error: message == 'storage_permission' ? 'Izin akses file diperlukan' : message,
++      error: message == 'storage_permission' ? _s.fileAccessRequired : message,
+     );
+     _notify();
+   }
+@@ -664,13 +666,13 @@ class DownloadService extends ChangeNotifier {
+ 
+       final receivedSum = chunks.fold<int>(0, (a, c) => a + c.received);
+       if (receivedSum < size) {
+-        throw _RetryableError('koneksi berhenti sebelum selesai');
++        throw _RetryableError(_s.connectionDropped);
+       }
+ 
+       await raf.flush();
+       final length = await raf.length();
+       if (length != size) {
+-        throw _RetryableError('ukuran file tidak sesuai ($length/$size byte)');
++        throw _RetryableError(_s.sizeMismatch(length, size));
+       }
+       task.received = size;
+     } finally {
+@@ -751,7 +753,7 @@ class DownloadService extends ChangeNotifier {
+         }
+ 
+         if (chunk.offset <= chunk.end) {
+-          throw _RetryableError('potongan belum selesai');
++          throw _RetryableError(_s.chunkIncomplete);
+         }
+       } catch (e) {
+         if (task.canceled || _disposed) return;
+@@ -838,7 +840,7 @@ class DownloadService extends ChangeNotifier {
+       try {
+         await part.delete();
+       } catch (_) {}
+-      throw _RetryableError('rentang tidak valid');
++      throw _RetryableError(_s.invalidRange);
+     }
+     if (code != 200 && code != 206) {
+       throw PixeldrainException('HTTP $code');
+@@ -872,7 +874,7 @@ class DownloadService extends ChangeNotifier {
+     }
+ 
+     if (task.size > 0 && received < task.size) {
+-      throw _RetryableError('koneksi berhenti sebelum selesai');
++      throw _RetryableError(_s.connectionDropped);
+     }
+     task.received = received;
+   }
+@@ -936,29 +938,29 @@ class DownloadService extends ChangeNotifier {
+     return clean;
+   }
+ 
++  /// Teks error sesuai bahasa aktif.
++  AppStrings get _s => LocaleController.instance.strings;
++
+   String _friendlyError(Object? error) {
+-    if (error == null) return 'Download gagal.';
++    if (error == null) return _s.downloadFailed;
+     if (error is PixeldrainException) return error.message;
+     if (error is _RetryableError) return error.message;
+     if (error is DioException) {
+       final code = error.response?.statusCode ?? 0;
+-      if (code == 404) return 'File tidak ditemukan di Pixeldrain.';
+-      if (code == 403) {
+-        return 'Server menolak (HTTP 403) — biasanya batas unduhan Pixeldrain '
+-            'sudah tercapai atau file dibatasi. Coba lagi nanti / buka di browser.';
+-      }
+-      if (code == 401) return 'Akses file ditolak (HTTP 401).';
+-      if (code == 429) return 'Server masih membatasi. Coba lagi nanti.';
+-      if (code >= 500) return 'Server download bermasalah (HTTP $code).';
++      if (code == 404) return _s.fileNotFoundOnPixeldrain;
++      if (code == 403) return _s.downloadBlocked;
++      if (code == 401) return _s.downloadDenied;
++      if (code == 429) return _s.serverRateLimited;
++      if (code >= 500) return _s.serverError(code);
+       switch (error.type) {
+         case DioExceptionType.connectionTimeout:
+         case DioExceptionType.receiveTimeout:
+         case DioExceptionType.sendTimeout:
+-          return 'Koneksi timeout. Coba lagi.';
++          return _s.connectionTimeout;
+         case DioExceptionType.connectionError:
+-          return 'Tidak ada koneksi internet.';
++          return _s.noInternet;
+         default:
+-          return error.message ?? 'Download gagal.';
++          return error.message ?? _s.downloadFailed;
+       }
+     }
+     final text = error.toString();
+diff --git a/lib/services/native_downloads.dart b/lib/services/native_downloads.dart
+index 8af2ebc..5eef467 100644
+--- a/lib/services/native_downloads.dart
++++ b/lib/services/native_downloads.dart
+@@ -1,5 +1,8 @@
+ import 'package:flutter/services.dart';
+ 
++import '../l10n/app_strings.dart';
++import '../l10n/locale_controller.dart';
++
+ /// Hasil enqueue di DownloadManager Android.
+ class NativeDownloadHandle {
+   const NativeDownloadHandle({
+@@ -57,6 +60,9 @@ class NativeDownloadException implements Exception {
+ class NativeDownloads {
+   static const MethodChannel _channel = MethodChannel('com.nel.dropify/native');
+ 
++  /// Teks error sesuai bahasa aktif.
++  static AppStrings get _s => LocaleController.instance.strings;
++
+   /// Folder tujuan yang dipakai aplikasi.
+   static const String subdir = 'Dropify';
+   static const String folderPath = '/storage/emulated/0/Download/Dropify';
+@@ -76,7 +82,7 @@ class NativeDownloads {
+         'headers': headers,
+       });
+       if (res == null) {
+-        throw NativeDownloadException('Downloader tidak merespons.');
++        throw NativeDownloadException(_s.downloaderNotResponding);
+       }
+       return NativeDownloadHandle(
+         id: (res['id'] as num).toInt(),
+@@ -84,10 +90,9 @@ class NativeDownloads {
+         path: res['path']?.toString() ?? folderPath,
+       );
+     } on PlatformException catch (e) {
+-      throw NativeDownloadException(e.message ?? 'Gagal memulai download.');
++      throw NativeDownloadException(e.message ?? _s.downloadStartFailed);
+     } on MissingPluginException {
+-      throw NativeDownloadException(
+-          'Downloader Android tidak tersedia di perangkat ini.');
++      throw NativeDownloadException(_s.downloaderUnavailable);
+     }
+   }
+ 
+diff --git a/lib/services/pixeldrain_api.dart b/lib/services/pixeldrain_api.dart
+index 6544f35..7f51895 100644
+--- a/lib/services/pixeldrain_api.dart
++++ b/lib/services/pixeldrain_api.dart
+@@ -4,6 +4,8 @@ import 'dart:io';
+ import 'package:dio/dio.dart';
+ import 'package:shared_preferences/shared_preferences.dart';
+ 
++import '../l10n/app_strings.dart';
++import '../l10n/locale_controller.dart';
+ import '../models/pd_item.dart';
+ 
+ class LoginResult {
+@@ -34,6 +36,9 @@ class PixeldrainException implements Exception {
+ class PixeldrainApi {
+   static const _keyPref = 'pd_auth_key';
+ 
++  /// Teks error sesuai bahasa aktif.
++  AppStrings get _s => LocaleController.instance.strings;
++
+   final Dio _dio = Dio(
+     BaseOptions(
+       baseUrl: 'https://pixeldrain.com/api',
+@@ -108,45 +113,44 @@ class PixeldrainApi {
+       final code = body['value'] as String? ?? '';
+       switch (code) {
+         case 'user_not_found':
+-          return const LoginResult(
++          return LoginResult(
+               success: false,
+               code: 'user_not_found',
+-              message: 'Username / email tidak ditemukan.');
++              message: _s.loginError('user_not_found', ''));
+         case 'password_incorrect':
+-          return const LoginResult(
++          return LoginResult(
+               success: false,
+               code: 'password_incorrect',
+-              message: 'Password salah.');
++              message: _s.loginError('password_incorrect', ''));
+         case 'otp_required':
+-          return const LoginResult(
++          return LoginResult(
+               success: false,
+               code: 'otp_required',
+               needsOtp: true,
+-              message: 'Akun ini memakai 2FA. Masukkan kode 6 digit.');
++              message: _s.loginError('otp_required', ''));
+         case 'otp_incorrect':
+-          return const LoginResult(
++          return LoginResult(
+               success: false,
+               code: 'otp_incorrect',
+               needsOtp: true,
+-              message: 'Kode 2FA salah.');
++              message: _s.loginError('otp_incorrect', ''));
+         case 'ip_rate_limit_reached':
+-          return const LoginResult(
++          return LoginResult(
+               success: false,
+               code: 'rate_limited',
+-              message: 'Terlalu banyak percobaan login. Coba lagi nanti.');
++              message: _s.loginError('rate_limited', ''));
+         default:
+           final msg = body['message'] as String?;
+           return LoginResult(
+             success: false,
+-            message: msg ??
+-                'Login gagal (HTTP ${response.statusCode}). Coba lagi.',
++            message: msg ?? _s.loginFailedHttp(response.statusCode ?? 0),
+           );
+       }
+     } on DioException catch (e) {
+       return LoginResult(
+         success: false,
+         code: 'network',
+-        message: 'Gagal terhubung ke Pixeldrain: ${e.message ?? e.type.name}',
++        message: _s.connectionFailed(e.message ?? e.type.name),
+       );
+     } catch (e) {
+       return LoginResult(success: false, message: 'Error: $e');
+@@ -189,8 +193,7 @@ class PixeldrainApi {
+     } on PixeldrainException {
+       rethrow;
+     } on DioException catch (e) {
+-      throw PixeldrainException(
+-          'Gagal terhubung ke Pixeldrain: ${e.message ?? e.type.name}');
++      throw PixeldrainException(_s.connectionFailed(e.message ?? e.type.name));
+     }
+   }
+ 
+@@ -200,15 +203,12 @@ class PixeldrainApi {
+     final body = _asMap(response.data);
+ 
+     if (filesystem && (code == 401 || code == 403)) {
+-      throw PixeldrainException(
+-        'Fitur folder (filesystem) hanya tersedia untuk akun Pixeldrain '
+-        'berlangganan Pro. File kamu tetap bisa diakses lewat "All uploads".',
+-      );
++      throw PixeldrainException(_s.proFeatureBody);
+     }
+ 
+     final msg = (body['message'] ?? body['value'] ?? 'HTTP $code').toString();
+     throw PixeldrainException(
+-      code == 401 || code == 403 ? 'Sesi habis, silakan login ulang.' : msg,
++      code == 401 || code == 403 ? _s.sessionExpired : msg,
+       unauthorized: code == 401 || code == 403,
+     );
+   }
+diff --git a/lib/services/transfer_session.dart b/lib/services/transfer_session.dart
+index 5bf71f1..e7737ea 100644
+--- a/lib/services/transfer_session.dart
++++ b/lib/services/transfer_session.dart
+@@ -1,3 +1,4 @@
++import '../l10n/locale_controller.dart';
+ import 'native_downloads.dart';
+ 
+ /// Menjaga satu foreground service selama masih ada upload atau download,
+@@ -24,7 +25,8 @@ class TransferSession {
+     if (_uploadsActive || _downloadsActive) {
+       if (!_running) {
+         _running = true;
+-        NativeDownloads.startTransferService('Transfer berjalan');
++        NativeDownloads.startTransferService(
++          LocaleController.instance.strings.transferRunning);
+       }
+     } else if (_running) {
+       _running = false;
+diff --git a/lib/utils/file_types.dart b/lib/utils/file_types.dart
+index 2af2046..6e076df 100644
+--- a/lib/utils/file_types.dart
++++ b/lib/utils/file_types.dart
+@@ -1,18 +1,20 @@
+ import 'package:flutter/material.dart';
+ import 'package:intl/intl.dart';
++import '../l10n/app_strings.dart';
+ import '../theme/app_theme.dart';
+ 
+ enum FileCategory { archives, videos, apps, images, audio, documents, other }
+ 
+ extension FileCategoryX on FileCategory {
+-  String get label => switch (this) {
+-        FileCategory.archives => 'Archives',
+-        FileCategory.videos => 'Videos',
+-        FileCategory.apps => 'Apps',
+-        FileCategory.images => 'Images',
+-        FileCategory.audio => 'Audio',
+-        FileCategory.documents => 'Documents',
+-        FileCategory.other => 'Other',
++  /// Nama kategori sesuai bahasa aktif.
++  String label(AppStrings s) => switch (this) {
++        FileCategory.archives => s.categoryArchives,
++        FileCategory.videos => s.categoryVideos,
++        FileCategory.apps => s.categoryApps,
++        FileCategory.images => s.categoryImages,
++        FileCategory.audio => s.categoryAudio,
++        FileCategory.documents => s.categoryDocuments,
++        FileCategory.other => s.categoryOther,
+       };
+ 
+   IconData get icon => switch (this) {
+@@ -35,18 +37,16 @@ extension FileCategoryX on FileCategory {
+         FileCategory.other => AppColors.other,
+       };
+ 
+-  String countLabel(int n) {
+-    final s = n == 1;
+-    return switch (this) {
+-      FileCategory.archives => '$n ${s ? 'file' : 'files'}',
+-      FileCategory.videos => '$n ${s ? 'video' : 'videos'}',
+-      FileCategory.apps => '$n ${s ? 'app' : 'apps'}',
+-      FileCategory.images => '$n ${s ? 'photo' : 'photos'}',
+-      FileCategory.audio => '$n ${s ? 'track' : 'tracks'}',
+-      FileCategory.documents => '$n ${s ? 'document' : 'documents'}',
+-      FileCategory.other => '$n ${s ? 'file' : 'files'}',
+-    };
+-  }
++  /// Mis. "12 file" / "12 files", sesuai bahasa aktif.
++  String countLabel(int n, AppStrings strings) => switch (this) {
++        FileCategory.archives => strings.countFiles(n),
++        FileCategory.videos => strings.countVideos(n),
++        FileCategory.apps => strings.countApps(n),
++        FileCategory.images => strings.countPhotos(n),
++        FileCategory.audio => strings.countTracks(n),
++        FileCategory.documents => strings.countDocuments(n),
++        FileCategory.other => strings.countFiles(n),
++      };
+ }
+ 
+ const _archiveExt = {
+@@ -106,11 +106,11 @@ String formatSize(int bytes) {
+ String formatDate(DateTime? d) =>
+     d == null ? '' : DateFormat('d MMM yyyy').format(d);
+ 
+-String formatAgo(DateTime d) {
++String formatAgo(DateTime d, AppStrings strings) {
+   final diff = DateTime.now().difference(d);
+-  if (diff.inSeconds < 10) return 'just now';
+-  if (diff.inMinutes < 1) return '${diff.inSeconds}s ago';
+-  if (diff.inHours < 1) return '${diff.inMinutes} min ago';
+-  if (diff.inDays < 1) return '${diff.inHours} h ago';
+-  return '${diff.inDays} d ago';
++  if (diff.inSeconds < 10) return strings.justNow;
++  if (diff.inMinutes < 1) return strings.secondsAgo(diff.inSeconds);
++  if (diff.inHours < 1) return strings.minutesAgo(diff.inMinutes);
++  if (diff.inDays < 1) return strings.hoursAgo(diff.inHours);
++  return strings.daysAgo(diff.inDays);
+ }
+diff --git a/lib/widgets/file_actions.dart b/lib/widgets/file_actions.dart
+index a083549..aeb03f6 100644
+--- a/lib/widgets/file_actions.dart
++++ b/lib/widgets/file_actions.dart
+@@ -93,7 +93,7 @@ Future<void> downloadItem(
+     text,
+     // Kalau server menolak (403), tawarkan buka di browser sebagai jalan lain.
+     action: SnackBarAction(
+-      label: forbidden && fileId.isNotEmpty ? 'Browser' : s.downloads,
++      label: forbidden && fileId.isNotEmpty ? s.browser : s.downloads,
+       onPressed: () {
+         if (forbidden && fileId.isNotEmpty) {
+           launchUrl(
+@@ -108,7 +108,14 @@ Future<void> downloadItem(
+   );
+ }
+ 
+-void showItemActions(BuildContext context, DriveController ctrl, PdItem item) {
++/// [origin] = rect global widget yang ditekan; kalau ada, sheet tumbuh dari
++/// titik itu.
++void showItemActions(
++  BuildContext context,
++  DriveController ctrl,
++  PdItem item, {
++  Rect? origin,
++}) {
+   final s = context.s;
+   final bypass = PixeldrainBypass.linkForFileId(item.id);
+   final subtitle = [
+@@ -125,6 +132,8 @@ void showItemActions(BuildContext context, DriveController ctrl, PdItem item) {
+   showExpressiveSheet<void>(
+     context: context,
+     isScrollControlled: true,
++    variant: SheetVariant.fadeThrough,
++    origin: origin,
+     builder: (sheetContext) => _ItemSheet(
+       title: item.name,
+       subtitle: subtitle,
+@@ -271,52 +280,54 @@ class _ItemSheet extends StatelessWidget {
+             mainAxisSize: MainAxisSize.min,
+             crossAxisAlignment: CrossAxisAlignment.stretch,
+             children: [
+-              Row(
+-                children: [
+-                  GlowIcon(icon: icon, size: 44, color: color),
+-                  const SizedBox(width: 13),
+-                  Expanded(
+-                    child: Column(
+-                      crossAxisAlignment: CrossAxisAlignment.start,
+-                      mainAxisSize: MainAxisSize.min,
+-                      children: [
+-                        Text(
+-                          title,
+-                          maxLines: 2,
+-                          overflow: TextOverflow.ellipsis,
+-                          style: TextStyle(
+-                            color: AppColors.text,
+-                            fontSize: 15.5,
+-                            height: 1.25,
+-                            fontWeight: FontWeight.w700,
+-                            letterSpacing: -0.2,
+-                          ),
+-                        ),
+-                        if (subtitle.isNotEmpty) ...[
+-                          const SizedBox(height: 3),
++              Stagger(
++                index: 0,
++                slide: 8,
++                child: Row(
++                  children: [
++                    GlowIcon(icon: icon, size: 44, color: color),
++                    const SizedBox(width: 13),
++                    Expanded(
++                      child: Column(
++                        crossAxisAlignment: CrossAxisAlignment.start,
++                        mainAxisSize: MainAxisSize.min,
++                        children: [
+                           Text(
+-                            subtitle,
+-                            maxLines: 1,
++                            title,
++                            maxLines: 2,
+                             overflow: TextOverflow.ellipsis,
+                             style: TextStyle(
+-                              color: scheme.onSurfaceVariant,
+-                              fontSize: 12,
++                              color: AppColors.text,
++                              fontSize: 15.5,
++                              height: 1.25,
++                              fontWeight: FontWeight.w700,
++                              letterSpacing: -0.2,
+                             ),
+                           ),
++                          if (subtitle.isNotEmpty) ...[
++                            const SizedBox(height: 3),
++                            Text(
++                              subtitle,
++                              maxLines: 1,
++                              overflow: TextOverflow.ellipsis,
++                              style: TextStyle(
++                                color: scheme.onSurfaceVariant,
++                                fontSize: 12,
++                              ),
++                            ),
++                          ],
+                         ],
+-                      ],
++                      ),
+                     ),
+-                  ),
+-                ],
++                  ],
++                ),
+               ),
+               const SizedBox(height: 8),
+-              for (var i = 0; i < actions.length; i++)
+-                Stagger(
+-                  index: i,
+-                  step: const Duration(milliseconds: 35),
+-                  slide: 10,
+-                  child: _ActionRow(action: actions[i]),
+-                ),
++              ...staggered(
++                [for (final action in actions) _ActionRow(action: action)],
++                start: 1,
++                step: const Duration(milliseconds: 24),
++              ),
+             ],
+           ),
+         ),
+diff --git a/lib/widgets/file_tile.dart b/lib/widgets/file_tile.dart
+index 16bdbad..6dc46c5 100644
+--- a/lib/widgets/file_tile.dart
++++ b/lib/widgets/file_tile.dart
+@@ -1,6 +1,7 @@
+ import 'package:flutter/material.dart';
+ 
+ import '../controllers/drive_controller.dart';
++import '../l10n/locale_controller.dart';
+ import '../models/pd_item.dart';
+ import '../screens/files_tab.dart';
+ import '../theme/app_theme.dart';
+@@ -31,7 +32,7 @@ class FileTile extends StatelessWidget {
+     final scheme = AppColors.scheme;
+     final color = item.isDir ? scheme.primary : cat.color;
+     final subtitle = item.isDir
+-        ? 'Folder'
++        ? context.s.folder
+         : [formatSize(item.size), formatDate(item.date)]
+             .where((e) => e.isNotEmpty)
+             .join(' · ');
+@@ -60,7 +61,14 @@ class FileTile extends StatelessWidget {
+               }
+             },
+             onLongPress: onLongPress ??
+-                (item.isDir ? null : () => showItemActions(context, ctrl, item)),
++                (item.isDir
++                    ? null
++                    : () => showItemActions(
++                          context,
++                          ctrl,
++                          item,
++                          origin: globalRectOf(context),
++                        )),
+             child: Padding(
+               padding: const EdgeInsets.fromLTRB(12, 10, 6, 10),
+               child: Row(
+@@ -112,7 +120,12 @@ class FileTile extends StatelessWidget {
+                     IconButton(
+                       icon: Icon(Icons.more_vert_rounded,
+                           color: scheme.onSurfaceVariant, size: 20),
+-                      onPressed: () => showItemActions(context, ctrl, item),
++                      onPressed: () => showItemActions(
++                        context,
++                        ctrl,
++                        item,
++                        origin: globalRectOf(context),
++                      ),
+                     ),
+                 ],
+               ),
+diff --git a/lib/widgets/link_download_sheet.dart b/lib/widgets/link_download_sheet.dart
+index 496c70c..e2425b6 100644
+--- a/lib/widgets/link_download_sheet.dart
++++ b/lib/widgets/link_download_sheet.dart
+@@ -105,7 +105,7 @@ class _LinkSheetState extends State<_LinkSheet> {
+       if (task != null) {
+         ScaffoldMessenger.of(context).showSnackBar(
+           SnackBar(
+-            content: Text('${s.download} ${task.name}'),
++            content: Text(s.downloadStartedSnack(task.name)),
+             action: SnackBarAction(
+               label: s.downloads,
+               onPressed: () => showTransfers(context, widget.ctrl),
+diff --git a/lib/widgets/motion.dart b/lib/widgets/motion.dart
+index 2cb7ae3..0e19ad0 100644
+--- a/lib/widgets/motion.dart
++++ b/lib/widgets/motion.dart
+@@ -134,6 +134,8 @@ class Stagger extends StatelessWidget {
+ 
+   @override
+   Widget build(BuildContext context) {
++    // Mode hemat animasi: langsung tampil, tanpa geser/skala.
++    if (MediaQuery.disableAnimationsOf(context)) return child;
+     final raw = step * index;
+     final delay = raw > maxDelay ? maxDelay : raw;
+ 
+@@ -416,82 +418,414 @@ BorderRadius squircle(double radius) => BorderRadius.only(
+ /// Jarak horisontal antar halaman, dipakai tab bar.
+ double tabOffset(int from, int to) => (to - from).toDouble() * math.pi;
+ 
++/// Posisi kartu dialog di layar.
++enum DialogAnchor { center, top, bottom }
++
++/// Gaya masuk bottom sheet.
++enum SheetVariant {
++  /// Pegas naik dari bawah + fade (default).
++  slide,
++
++  /// Skala 0.96 → 1 + fade tanpa geser — cocok untuk panel aksi ringkas.
++  fadeThrough,
++}
++
++/// Rect global sebuah widget, dipakai untuk animasi "tumbuh dari titik tekan".
++Rect? globalRectOf(BuildContext context) {
++  final box = context.findRenderObject();
++  if (box is! RenderBox || !box.hasSize) return null;
++  final origin = box.localToGlobal(Offset.zero);
++  return origin & box.size;
++}
++
++/// Bungkus deretan baris sheet/dialog supaya muncul bertingkat dengan
++/// [Stagger]. Dipakai untuk daftar aksi di sheet.
++List<Widget> staggered(
++  Iterable<Widget> children, {
++  int start = 0,
++  Duration step = const Duration(milliseconds: 24),
++  double slide = 10,
++}) {
++  final list = children.toList(growable: false);
++  return [
++    for (var i = 0; i < list.length; i++)
++      Stagger(
++        index: start + i,
++        step: step,
++        slide: slide,
++        duration: Motion.base,
++        child: list[i],
++      ),
++  ];
++}
++
+ /// Dialog bergaya "popup" Material Expressive: latar diblur, kartu masuk dengan
+-/// skala pegas + fade (bukan fade datar seperti dialog bawaan).
++/// skala pegas 0.94 → 1 + fade-through, bukan fade datar seperti dialog bawaan.
++///
++/// [alignment] menentukan arah geser 12 px (ke atas untuk `top`, ke bawah untuk
++/// `bottom`, tanpa geser untuk `center`) sekaligus posisi kartu di layar.
+ Future<T?> showExpressiveDialog<T>({
+   required BuildContext context,
+   required WidgetBuilder builder,
+   bool barrierDismissible = true,
++  DialogAnchor alignment = DialogAnchor.center,
+ }) {
++  final reduceMotion = MediaQuery.disableAnimationsOf(context);
+   return showGeneralDialog<T>(
+     context: context,
+     barrierDismissible: barrierDismissible,
+-    barrierLabel:
+-        MaterialLocalizations.of(context).modalBarrierDismissLabel,
++    barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+     barrierColor: Colors.transparent,
+-    transitionDuration: Motion.slow,
+-    pageBuilder: (context, animation, secondaryAnimation) {
+-      final fade = CurvedAnimation(parent: animation, curve: Curves.easeOut);
+-      final scale = CurvedAnimation(
+-        parent: animation,
+-        curve: Motion.spring,
+-        reverseCurve: Motion.standard,
+-      );
+-      return Stack(
+-        children: [
+-          Positioned.fill(
++    transitionDuration: reduceMotion ? Motion.fast : Motion.slow,
++    pageBuilder: (context, animation, secondaryAnimation) => _DialogPage(
++      animation: animation,
++      alignment: alignment,
++      reduceMotion: reduceMotion,
++      builder: builder,
++    ),
++    transitionBuilder: (context, animation, secondary, child) => child,
++  );
++}
++
++class _DialogPage extends StatelessWidget {
++  const _DialogPage({
++    required this.animation,
++    required this.alignment,
++    required this.reduceMotion,
++    required this.builder,
++  });
++
++  final Animation<double> animation;
++  final DialogAnchor alignment;
++  final bool reduceMotion;
++  final WidgetBuilder builder;
++
++  @override
++  Widget build(BuildContext context) {
++    // Fade-through: konten muncul sambil membesar, jadi opacity-nya cepat
++    // selesai sebelum skala pegasnya mendarat.
++    final fade = CurvedAnimation(
++      parent: animation,
++      curve: const Interval(0, 0.7, curve: Motion.emphasized),
++      reverseCurve: Motion.standard,
++    );
++    final spring = CurvedAnimation(
++      parent: animation,
++      curve: Motion.spring,
++      reverseCurve: Motion.standard,
++    );
++    final scrim = CurvedAnimation(
++      parent: animation,
++      curve: const Interval(0, 0.6, curve: Motion.standard),
++      reverseCurve: Motion.standard,
++    );
++
++    final anchor = switch (alignment) {
++      DialogAnchor.center => Alignment.center,
++      DialogAnchor.top => const Alignment(0, -0.72),
++      DialogAnchor.bottom => const Alignment(0, 0.72),
++    };
++    final dy = switch (alignment) {
++      DialogAnchor.center => 0.0,
++      DialogAnchor.top => -12.0,
++      DialogAnchor.bottom => 12.0,
++    };
++
++    return Stack(
++      children: [
++        Positioned.fill(
++          child: IgnorePointer(
+             child: FadeTransition(
+-              opacity: fade,
++              opacity: scrim,
+               child: BackdropFilter(
+                 filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+-                child: ColoredBox(
+-                  color: Colors.black.withValues(alpha: 0.22),
+-                ),
++                child: ColoredBox(color: Colors.black.withValues(alpha: 0.22)),
+               ),
+             ),
+           ),
+-          Center(
+-            child: ScaleTransition(
+-              scale: Tween<double>(begin: 0.86, end: 1).animate(scale),
+-              child: FadeTransition(opacity: fade, child: builder(context)),
++        ),
++        Align(
++          alignment: anchor,
++          child: AnimatedBuilder(
++            animation: spring,
++            builder: (context, child) {
++              final t = spring.value.clamp(0.0, 1.0);
++              final scale = reduceMotion ? 1.0 : 0.94 + 0.06 * t;
++              final offset = reduceMotion ? 0.0 : dy * (1 - t);
++              return Opacity(
++                opacity: reduceMotion ? fade.value : t,
++                child: Transform.translate(
++                  offset: Offset(0, offset),
++                  child: Transform.scale(scale: scale, child: child),
++                ),
++              );
++            },
++            // AlertDialog/Dialog mengisi layar lalu memusatkan kartunya sendiri,
++            // jadi posisinya diatur lewat dialogTheme agar [alignment] berlaku.
++            child: Theme(
++              data: Theme.of(context).copyWith(
++                dialogTheme:
++                    Theme.of(context).dialogTheme.copyWith(alignment: anchor),
++              ),
++              child: builder(context),
+             ),
+           ),
+-        ],
+-      );
+-    },
+-    transitionBuilder: (context, animation, secondary, child) => child,
+-  );
++        ),
++      ],
++    );
++  }
+ }
+ 
+ /// Bottom sheet dengan kurva pegas + latar diblur, meniru rasa popup iOS.
++///
++/// [variant] memilih gaya masuk: [SheetVariant.slide] (naik + fade) atau
++/// [SheetVariant.fadeThrough] (skala + fade tanpa geser). Kalau [origin]
++/// diberikan (biasanya rect widget yang ditekan), sheet tumbuh dari titik itu
++/// — pendekatan kasar "container transform" tanpa Hero.
+ Future<T?> showExpressiveSheet<T>({
+   required BuildContext context,
+   required WidgetBuilder builder,
+   bool isScrollControlled = true,
+   bool useSafeArea = true,
++  SheetVariant variant = SheetVariant.slide,
++  Rect? origin,
++  bool barrierDismissible = true,
+ }) {
+-  return showModalBottomSheet<T>(
++  final reduceMotion = MediaQuery.disableAnimationsOf(context);
++  final duration = reduceMotion
++      ? Motion.fast
++      : (variant == SheetVariant.slide ? Motion.slow : Motion.base);
++  return showGeneralDialog<T>(
+     context: context,
+-    isScrollControlled: isScrollControlled,
+-    useSafeArea: useSafeArea,
+-    backgroundColor: Colors.transparent,
+-    barrierColor: Colors.black.withValues(alpha: 0.34),
+-    sheetAnimationStyle: AnimationStyle(
+-      duration: Motion.slow,
++    barrierDismissible: barrierDismissible,
++    barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
++    barrierColor: Colors.transparent,
++    transitionDuration: duration,
++    pageBuilder: (context, animation, secondaryAnimation) => _SheetPage(
++      animation: animation,
++      variant: variant,
++      origin: origin,
++      reduceMotion: reduceMotion,
++      useSafeArea: useSafeArea,
++      builder: builder,
++    ),
++    transitionBuilder: (context, animation, secondary, child) => child,
++  );
++}
++
++class _SheetPage extends StatefulWidget {
++  const _SheetPage({
++    required this.animation,
++    required this.variant,
++    required this.origin,
++    required this.reduceMotion,
++    required this.useSafeArea,
++    required this.builder,
++  });
++
++  final Animation<double> animation;
++  final SheetVariant variant;
++  final Rect? origin;
++  final bool reduceMotion;
++  final bool useSafeArea;
++  final WidgetBuilder builder;
++
++  @override
++  State<_SheetPage> createState() => _SheetPageState();
++}
++
++class _SheetPageState extends State<_SheetPage> {
++  double _drag = 0;
++
++  void _onDragEnd(DragEndDetails details) {
++    final v = details.primaryVelocity ?? 0;
++    if (_drag > 90 || v > 650) {
++      Navigator.of(context).maybePop();
++    } else {
++      setState(() => _drag = 0);
++    }
++  }
++
++  @override
++  Widget build(BuildContext context) {
++    final animation = widget.animation;
++    final variant = widget.variant;
++    final origin = widget.origin;
++    final reduceMotion = widget.reduceMotion;
++    final useSafeArea = widget.useSafeArea;
++    final builder = widget.builder;
++    final fade = CurvedAnimation(
++      parent: animation,
++      curve: const Interval(0, 0.75, curve: Motion.emphasized),
++      reverseCurve: Motion.standard,
++    );
++    final spring = CurvedAnimation(
++      parent: animation,
+       curve: Motion.spring,
+-      reverseDuration: Motion.base,
+       reverseCurve: Motion.standard,
+-    ),
+-    builder: (sheetContext) => Padding(
++    );
++    final scrim = CurvedAnimation(
++      parent: animation,
++      curve: const Interval(0, 0.6, curve: Motion.standard),
++      reverseCurve: Motion.standard,
++    );
++
++    final surface = Transform.translate(
++      offset: Offset(0, _drag),
++      child: GestureDetector(
++        onVerticalDragStart: (_) {},
++        onVerticalDragUpdate: (d) => setState(() {
++          _drag = (_drag + d.delta.dy).clamp(0.0, 400.0);
++        }),
++        onVerticalDragEnd: _onDragEnd,
++        child: Opacity(
++          opacity: (1 - _drag / 400).clamp(0.4, 1.0),
++          child: Padding(
+       padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+       child: Material(
+-        color: Theme.of(sheetContext).colorScheme.surfaceContainerLow,
++        color: Theme.of(context).colorScheme.surfaceContainerLow,
+         clipBehavior: Clip.antiAlias,
+         shape: const RoundedRectangleBorder(
+           borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+         ),
+-        child: builder(sheetContext),
++        child: useSafeArea
++            ? SafeArea(top: false, child: builder(context))
++            : builder(context),
+       ),
+-    ),
+-  );
++        ),
++      ),
++      ),
++    );
++
++    Widget motion;
++    if (reduceMotion) {
++      // Mode tanpa animasi: cukup fade singkat, tanpa geser/skala.
++      motion = FadeTransition(opacity: scrim, child: surface);
++    } else if (origin != null) {
++      motion = _OriginGrow(
++        origin: origin!,
++        animation: spring,
++        fade: fade,
++        child: surface,
++      );
++    } else if (variant == SheetVariant.fadeThrough) {
++      motion = AnimatedBuilder(
++        animation: spring,
++        builder: (context, child) {
++          final t = spring.value.clamp(0.0, 1.0);
++          return Opacity(
++            opacity: fade.value,
++            child: Transform.translate(
++              offset: Offset(0, 16 * (1 - t)),
++              child: Transform.scale(scale: 0.96 + 0.04 * t, child: child),
++            ),
++          );
++        },
++        child: surface,
++      );
++    } else {
++      motion = AnimatedBuilder(
++        animation: spring,
++        builder: (context, child) {
++          final t = spring.value.clamp(0.0, 1.0);
++          return Opacity(
++            opacity: fade.value,
++            child: Transform.translate(
++              offset: Offset(0, 72 * (1 - t)),
++              child: child,
++            ),
++          );
++        },
++        child: surface,
++      );
++    }
++
++    return Stack(
++      children: [
++        Positioned.fill(
++          child: IgnorePointer(
++            child: FadeTransition(
++              opacity: scrim,
++              child: BackdropFilter(
++                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
++                child: ColoredBox(color: Colors.black.withValues(alpha: 0.34)),
++              ),
++            ),
++          ),
++        ),
++        Positioned(left: 0, right: 0, bottom: 0, child: motion),
++      ],
++    );
++  }
++}
++
++/// Sheet yang tumbuh dari rect [origin] (mis. baris yang ditekan): pusat sheet
++/// dimulai di pusat rect itu dengan skala 0.9, lalu mengembang ke tempatnya.
++class _OriginGrow extends StatefulWidget {
++  const _OriginGrow({
++    required this.origin,
++    required this.animation,
++    required this.fade,
++    required this.child,
++  });
++
++  final Rect origin;
++  final Animation<double> animation;
++  final Animation<double> fade;
++  final Widget child;
++
++  @override
++  State<_OriginGrow> createState() => _OriginGrowState();
++}
++
++class _OriginGrowState extends State<_OriginGrow> {
++  final GlobalKey _box = GlobalKey();
++  Size _size = Size.zero;
++  Offset _global = Offset.zero;
++
++  @override
++  void initState() {
++    super.initState();
++    WidgetsBinding.instance.addPostFrameCallback((_) => _measure());
++  }
++
++  void _measure() {
++    if (!mounted) return;
++    final box = _box.currentContext?.findRenderObject();
++    if (box is! RenderBox || !box.hasSize) return;
++    final size = box.size;
++    final global = box.localToGlobal(Offset.zero);
++    if (size == _size && global == _global) return;
++    setState(() {
++      _size = size;
++      _global = global;
++    });
++  }
++
++  @override
++  Widget build(BuildContext context) {
++    return KeyedSubtree(
++      key: _box,
++      child: AnimatedBuilder(
++        animation: widget.animation,
++        builder: (context, child) {
++          final t = widget.animation.value.clamp(0.0, 1.0);
++          if (_size.isEmpty) {
++            return Opacity(opacity: widget.fade.value, child: child);
++          }
++          final centre = Offset(_size.width / 2, _size.height / 2);
++          final from = widget.origin.center - _global;
++          final delta = (from - centre) * (1 - t);
++          return Opacity(
++            opacity: widget.fade.value,
++            child: Transform.translate(
++              offset: delta,
++              child: Transform.scale(scale: 0.9 + 0.1 * t, child: child),
++            ),
++          );
++        },
++        child: widget.child,
++      ),
++    );
++  }
+ }
+diff --git a/lib/widgets/storage_card.dart b/lib/widgets/storage_card.dart
+index d7742aa..7602f39 100644
+--- a/lib/widgets/storage_card.dart
++++ b/lib/widgets/storage_card.dart
+@@ -167,7 +167,7 @@ class _HeroChip extends StatelessWidget {
+             Icon(stat.category.icon, size: 15, color: tint),
+             const SizedBox(width: 7),
+             Text(
+-              '${stat.category.label} · ${formatSize(stat.size)}',
++              '${stat.category.label(context.s)} · ${formatSize(stat.size)}',
+               style: TextStyle(
+                 color: onTint,
+                 fontSize: 12.5,
+diff --git a/lib/widgets/sync_card.dart b/lib/widgets/sync_card.dart
+index a067722..bed8b3f 100644
+--- a/lib/widgets/sync_card.dart
++++ b/lib/widgets/sync_card.dart
+@@ -35,7 +35,7 @@ class SyncCard extends StatelessWidget {
+       title = s.syncedTitle;
+       subtitle = ctrl.lastSync == null
+           ? null
+-          : s.filesAgo(ctrl.files.length, formatAgo(ctrl.lastSync!));
++          : s.filesAgo(ctrl.files.length, formatAgo(ctrl.lastSync!, s));
+       icon = Icons.cloud_done_outlined;
+     }
+ 
+diff --git a/lib/widgets/transfers_sheet.dart b/lib/widgets/transfers_sheet.dart
+index dc1e31b..3ca4383 100644
+--- a/lib/widgets/transfers_sheet.dart
++++ b/lib/widgets/transfers_sheet.dart
+@@ -280,8 +280,7 @@ class _TransferRow extends StatelessWidget {
+                 if (progress != null) ...[
+                   const SizedBox(height: 9),
+                   TweenAnimationBuilder<double>(
+-                    tween:
+-                        Tween(begin: 0, end: progress!.clamp(0.0, 1.0)),
++                    tween: Tween(begin: 0, end: progress!.clamp(0.0, 1.0)),
+                     duration: Motion.slow,
+                     curve: Motion.emphasized,
+                     builder: (context, value, _) => WaveProgressBar(
+@@ -337,80 +336,90 @@ class _DownloadsTab extends StatelessWidget {
+             mainAxisSize: MainAxisSize.min,
+             crossAxisAlignment: CrossAxisAlignment.stretch,
+             children: [
+-              Row(
+-                children: [
+-                  GlowIcon(
+-                    icon: Icons.error_outline_rounded,
+-                    size: 44,
+-                    color: AppColors.danger,
+-                  ),
+-                  const SizedBox(width: 13),
+-                  Expanded(
+-                    child: Column(
+-                      crossAxisAlignment: CrossAxisAlignment.start,
+-                      mainAxisSize: MainAxisSize.min,
+-                      children: [
+-                        Text(
+-                          task.name,
+-                          maxLines: 2,
+-                          overflow: TextOverflow.ellipsis,
+-                          style: TextStyle(
+-                            color: AppColors.text,
+-                            fontSize: 15.5,
+-                            height: 1.25,
+-                            fontWeight: FontWeight.w700,
+-                            letterSpacing: -0.2,
+-                          ),
+-                        ),
+-                        const SizedBox(height: 3),
+-                        Text(
+-                          describeDownloadError(
+-                            context,
+-                            task.error ?? s.downloadDetails,
++              Stagger(
++                index: 0,
++                slide: 8,
++                child: Row(
++                  children: [
++                    GlowIcon(
++                      icon: Icons.error_outline_rounded,
++                      size: 44,
++                      color: AppColors.danger,
++                    ),
++                    const SizedBox(width: 13),
++                    Expanded(
++                      child: Column(
++                        crossAxisAlignment: CrossAxisAlignment.start,
++                        mainAxisSize: MainAxisSize.min,
++                        children: [
++                          Text(
++                            task.name,
++                            maxLines: 2,
++                            overflow: TextOverflow.ellipsis,
++                            style: TextStyle(
++                              color: AppColors.text,
++                              fontSize: 15.5,
++                              height: 1.25,
++                              fontWeight: FontWeight.w700,
++                              letterSpacing: -0.2,
++                            ),
+                           ),
+-                          maxLines: 2,
+-                          overflow: TextOverflow.ellipsis,
+-                          style: TextStyle(
+-                            color: AppColors.danger,
+-                            fontSize: 12,
+-                            height: 1.35,
++                          const SizedBox(height: 3),
++                          Text(
++                            describeDownloadError(
++                              context,
++                              task.error ?? s.downloadDetails,
++                            ),
++                            maxLines: 2,
++                            overflow: TextOverflow.ellipsis,
++                            style: TextStyle(
++                              color: AppColors.danger,
++                              fontSize: 12,
++                              height: 1.35,
++                            ),
+                           ),
+-                        ),
+-                      ],
++                        ],
++                      ),
+                     ),
+-                  ),
+-                ],
+-              ),
+-              const SizedBox(height: 10),
+-              if (task.url != null)
+-                _DetailAction(
+-                  icon: Icons.link_rounded,
+-                  title: s.copyLink,
+-                  subtitle: task.url,
+-                  onTap: () {
+-                    Clipboard.setData(ClipboardData(text: task.url!));
+-                    Navigator.pop(sheetContext);
+-                  },
+-                ),
+-              _DetailAction(
+-                icon: Icons.refresh_rounded,
+-                title: s.retry,
+-                subtitle: s.attemptInfo(
+-                  task.attempts,
+-                  task.viaBypass ? s.viaBypass : s.viaPixeldrain,
++                  ],
+                 ),
+-                onTap: () {
+-                  Navigator.pop(sheetContext);
+-                  controller.downloads.retry(task.id);
+-                },
+               ),
+-              _DetailAction(
+-                icon: Icons.public_rounded,
+-                title: s.tryPixeldrain,
+-                onTap: () {
+-                  Navigator.pop(sheetContext);
+-                  controller.downloads.retryWithoutBypass(task.id);
+-                },
++              const SizedBox(height: 10),
++              ...staggered(
++                <Widget>[
++                  if (task.url != null)
++                    _DetailAction(
++                      icon: Icons.link_rounded,
++                      title: s.copyLink,
++                      subtitle: task.url,
++                      onTap: () {
++                        Clipboard.setData(ClipboardData(text: task.url!));
++                        Navigator.pop(sheetContext);
++                      },
++                    ),
++                  _DetailAction(
++                    icon: Icons.refresh_rounded,
++                    title: s.retry,
++                    subtitle: s.attemptInfo(
++                      task.attempts,
++                      task.viaBypass ? s.viaBypass : s.viaPixeldrain,
++                    ),
++                    onTap: () {
++                      Navigator.pop(sheetContext);
++                      controller.downloads.retry(task.id);
++                    },
++                  ),
++                  _DetailAction(
++                    icon: Icons.public_rounded,
++                    title: s.tryPixeldrain,
++                    onTap: () {
++                      Navigator.pop(sheetContext);
++                      controller.downloads.retryWithoutBypass(task.id);
++                    },
++                  ),
++                ],
++                start: 1,
++                step: const Duration(milliseconds: 24),
+               ),
+             ],
+           ),
+@@ -420,7 +429,8 @@ class _DownloadsTab extends StatelessWidget {
+   }
+ 
+   Future<void> _open(BuildContext context, DownloadTask task) async {
+-    final ok = await ctrl.downloads.openFile(task)
++    final ok = await ctrl.downloads
++        .openFile(task)
+         .then((_) => true)
+         .catchError((_) => false);
+     if (!ok && context.mounted) {
+@@ -506,7 +516,8 @@ class _DownloadsTab extends StatelessWidget {
+             maxLines: 2,
+             overflow: TextOverflow.ellipsis,
+             style: TextStyle(
+-              color: failed ? AppColors.danger : AppColors.scheme.onSurfaceVariant,
++              color:
++                  failed ? AppColors.danger : AppColors.scheme.onSurfaceVariant,
+               fontSize: 12,
+               height: 1.35,
+             ),
+@@ -562,7 +573,9 @@ class _EmptyTransfers extends StatelessWidget {
+                 OrbIcon(icon: icon, size: 96),
+                 const SizedBox(height: 16),
+                 Text(
+-                  emptyKey == _EmptyKind.downloads ? s.noDownloads : s.noUploads,
++                  emptyKey == _EmptyKind.downloads
++                      ? s.noDownloads
++                      : s.noUploads,
+                   textAlign: TextAlign.center,
+                   style: TextStyle(
+                     color: AppColors.scheme.onSurfaceVariant,
+diff --git a/pubspec.yaml b/pubspec.yaml
+index 267e830..689393c 100644
+--- a/pubspec.yaml
++++ b/pubspec.yaml
+@@ -1,7 +1,7 @@
+ name: dropify
+ description: A Pixeldrain Client.
+ publish_to: 'none'
+-version: 1.2.0+3
++version: 1.3.0+4
+ 
+ environment:
+   sdk: '>=3.0.0 <4.0.0'
+-- 
+2.34.1
+

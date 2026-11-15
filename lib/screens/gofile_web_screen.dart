@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:webview_flutter_android/webview_flutter_android.dart';
 
 import '../l10n/locale_controller.dart';
 import '../models/pd_item.dart';
@@ -26,6 +28,9 @@ import '../widgets/kit.dart';
 ///
 /// Hasilnya tampil di pill progres HomeTab dan sheet Transfers, dengan
 /// notifikasi sistem dari TransferService seperti unduhan Pixeldrain.
+///
+/// Unggah lewat tombol "Select files" di halaman Gofile memakai pemilih berkas
+/// Android aplikasi ([FilePicker]); tanpa ini WebView tidak membuka apa pun.
 class GofileWebScreen extends StatefulWidget {
   const GofileWebScreen({super.key, this.url, this.token});
 
@@ -77,6 +82,34 @@ class _GofileWebScreenState extends State<GofileWebScreen> {
         ),
       )
       ..loadRequest(Uri.parse(_startUrl));
+
+    _attachFileChooser();
+  }
+
+  /// Sambungkan pemilih berkas WebView ke pemilih berkas aplikasi, supaya
+  /// unggahan Gofile (input type=file) benar-benar bisa memilih berkas.
+  void _attachFileChooser() {
+    final platform = _web.platform;
+    if (platform is AndroidWebViewController) {
+      unawaited(platform.setOnShowFileSelector(_onShowFileSelector));
+    }
+  }
+
+  Future<List<String>> _onShowFileSelector(FileSelectorParams params) async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        allowMultiple: params.mode == FileSelectorMode.openMultiple,
+        type: FileType.any,
+        withData: false,
+      );
+      if (result == null) return const <String>[];
+      return <String>[
+        for (final file in result.files)
+          if (file.path != null && file.path!.isNotEmpty) file.path!,
+      ];
+    } catch (_) {
+      return const <String>[];
+    }
   }
 
   @override

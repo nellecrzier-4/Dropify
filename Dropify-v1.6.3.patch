@@ -1,0 +1,112 @@
+From abdfbc4781e3ce39bb33bc11a7d6be9236d88080 Mon Sep 17 00:00:00 2001
+From: design-bot <design@local>
+Date: Sun, 15 Nov 2026 08:15:33 +0000
+Subject: [PATCH] =?UTF-8?q?release:=20v1.6.3=20(versionCode=2015)=20?=
+ =?UTF-8?q?=E2=80=94=20diagnosa=20Gofile?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ lib/controllers/gofile_controller.dart |  5 ++++-
+ lib/screens/files_tab.dart             | 10 ++++++++++
+ lib/services/gofile_api.dart           |  6 ++++++
+ pubspec.yaml                           |  2 +-
+ 4 files changed, 21 insertions(+), 2 deletions(-)
+
+diff --git a/lib/controllers/gofile_controller.dart b/lib/controllers/gofile_controller.dart
+index 80ec1b8..aed716c 100644
+--- a/lib/controllers/gofile_controller.dart
++++ b/lib/controllers/gofile_controller.dart
+@@ -112,7 +112,7 @@ class GofileController extends ChangeNotifier {
+     if (account == null) return;
+     try {
+       _entries = await api.list(account.rootFolder, account.token);
+-      _error = null;
++      _error = _entries.isEmpty ? 'kosong' : null;
+     } catch (e) {
+       _error = e is GofileException ? e.code : 'koneksi';
+     }
+@@ -154,6 +154,9 @@ class GofileController extends ChangeNotifier {
+ 
+   String? get shareId => _shareId;
+ 
++  /// Diagnosa panggilan terakhir (untuk layar Gofile).
++  String get diagnostics => api.lastDebug;
++
+   Future<void> logout() async {
+     _token = null;
+     _account = null;
+diff --git a/lib/screens/files_tab.dart b/lib/screens/files_tab.dart
+index b6c988f..c1a8d6e 100644
+--- a/lib/screens/files_tab.dart
++++ b/lib/screens/files_tab.dart
+@@ -282,11 +282,21 @@ class _GofileBrowserState extends State<_GofileBrowser> {
+                       const SizedBox(height: 10),
+                       Text(
+                         s.gofileEmpty,
++                        textAlign: TextAlign.center,
+                         style: TextStyle(
+                           color: scheme.onSurfaceVariant,
+                           fontSize: 13,
+                         ),
+                       ),
++                      const SizedBox(height: 8),
++                      SelectableText(
++                        ctrl.diagnostics,
++                        textAlign: TextAlign.center,
++                        style: TextStyle(
++                          color: scheme.onSurfaceVariant.withValues(alpha: 0.7),
++                          fontSize: 10.5,
++                        ),
++                      ),
+                     ],
+                   ),
+                   ),
+diff --git a/lib/services/gofile_api.dart b/lib/services/gofile_api.dart
+index 8995cce..9a442e5 100644
+--- a/lib/services/gofile_api.dart
++++ b/lib/services/gofile_api.dart
+@@ -21,6 +21,9 @@ class GofileApi {
+ 
+   final Dio _dio;
+ 
++  /// Info mentah panggilan terakhir, dipakai layar untuk diagnosa.
++  String lastDebug = '';
++
+   /// Minta tautan masuk dikirim ke [email].
+   Future<void> requestLoginLink(String email) async {
+     final res = await _dio.post<Map<String, dynamic>>(
+@@ -121,6 +124,8 @@ class GofileApi {
+         _apiCode(e) ?? 'HTTP ${e.response?.statusCode ?? 0}',
+       );
+     }
++    lastDebug = 'GET /contents/$folderId → ${res.statusCode} '
++        'status=${res.data?['status']}';
+     final data = _data(res);
+     // `children` bisa berupa map (id -> entry) atau list, tergantung versi API.
+     final children = data['children'] ?? data['files'] ?? data['contents'];
+@@ -138,6 +143,7 @@ class GofileApi {
+         entries.add(GofileEntry.fromJson(Map<String, dynamic>.from(value)));
+       }
+     }
++    lastDebug += ' · children=${raw.length} · keys=${data.keys.join(',')}';
+     entries.sort((a, b) {
+       if (a.isDir != b.isDir) return a.isDir ? -1 : 1;
+       return b.date.compareTo(a.date);
+diff --git a/pubspec.yaml b/pubspec.yaml
+index ce00d9d..3ce02b3 100644
+--- a/pubspec.yaml
++++ b/pubspec.yaml
+@@ -1,7 +1,7 @@
+ name: dropify
+ description: A Pixeldrain Client.
+ publish_to: 'none'
+-version: 1.6.2+14
++version: 1.6.3+15
+ 
+ environment:
+   sdk: '>=3.0.0 <4.0.0'
+-- 
+2.34.1
+

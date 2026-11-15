@@ -1,0 +1,103 @@
+From 1cf0786d26e78854da968a9a28753004d662a9b7 Mon Sep 17 00:00:00 2001
+From: design-bot <design@local>
+Date: Sun, 15 Nov 2026 07:35:13 +0000
+Subject: [PATCH] =?UTF-8?q?release:=20v1.5.2=20(versionCode=2011)=20?=
+ =?UTF-8?q?=E2=80=94=20login=20Gofile=20via=20tautan?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ lib/l10n/app_strings.dart    | 16 ++++++++--------
+ lib/services/gofile_api.dart | 10 +++++-----
+ pubspec.yaml                 |  2 +-
+ 3 files changed, 14 insertions(+), 14 deletions(-)
+
+diff --git a/lib/l10n/app_strings.dart b/lib/l10n/app_strings.dart
+index f30031d..f3269de 100644
+--- a/lib/l10n/app_strings.dart
++++ b/lib/l10n/app_strings.dart
+@@ -1000,8 +1000,8 @@ class StringsId extends AppStrings {
+ 
+   @override
+   String get gofileIntro =>
+-      'Masukkan email akun Gofile. Kami kirim tautan masuk ke email itu; tempel '
+-      'tautannya di sini untuk menyambungkan akun.';
++      'Masukkan email akun Gofile. Kami kirim tautan masuk ke email itu — tempel '
++      'tautannya (atau token 32 karakternya) di kolom kedua.';
+ 
+   @override
+   String get gofileEmailHint => 'Email akun Gofile';
+@@ -1026,8 +1026,8 @@ class StringsId extends AppStrings {
+ 
+   @override
+   String get gofileTokenNeeded =>
+-      'Tautan login dari email tidak bisa dipakai langsung oleh aplikasi. '
+-      'Buka gofile.io → Profile → API token, lalu tempel token itu di sini.';
++      'Tempel tautan login dari email (atau 32 karakter tokennya). '
++      'Kalau tautannya kedaluwarsa, kirim ulang lalu salin yang terbaru.';
+ 
+   @override
+   String get gofilePremiumNeeded =>
+@@ -1769,8 +1769,8 @@ class StringsEn extends AppStrings {
+ 
+   @override
+   String get gofileIntro =>
+-      'Enter your Gofile account email. We send a sign-in link to it; paste '
+-      'that link here to connect the account.';
++      'Enter your Gofile account email. We send a sign-in link to it — paste '
++      'that link (or its 32-character token) in the second field.';
+ 
+   @override
+   String get gofileEmailHint => 'Gofile account email';
+@@ -1795,8 +1795,8 @@ class StringsEn extends AppStrings {
+ 
+   @override
+   String get gofileTokenNeeded =>
+-      'The sign-in link from the email cannot be used by the app directly. '
+-      'Open gofile.io → Profile → API token, then paste that token here.';
++      'Paste the sign-in link from the email (or its 32-character token). '
++      'If the link expired, send a new one and copy the latest.';
+ 
+   @override
+   String get gofilePremiumNeeded =>
+diff --git a/lib/services/gofile_api.dart b/lib/services/gofile_api.dart
+index f82b9b2..56bb497 100644
+--- a/lib/services/gofile_api.dart
++++ b/lib/services/gofile_api.dart
+@@ -34,14 +34,14 @@ class GofileApi {
+     }
+   }
+ 
+-  /// Ambil info akun dari token. Endpoint Gofile butuh account id di path,
+-  /// jadi id diambil dari klaim di dalam token (JWT) kalau ada.
++  /// Ambil info akun dari token (32 karakter, dari tautan login email).
++  ///
++  /// Endpoint web Gofile: `GET /accounts/website` dengan Authorization Bearer.
++  /// Ini yang dipakai halaman login mereka — tidak perlu account id di path.
+   Future<GofileAccount> account(String token, {String? accountId}) async {
+-    final id = accountId ?? accountIdFromToken(token);
+-    if (id == null) throw GofileException('butuh_api_token');
+     try {
+       final res = await _dio.get<Map<String, dynamic>>(
+-        '/accounts/$id',
++        '/accounts/website',
+         options: Options(headers: _auth(token)),
+       );
+       final data = _data(res);
+diff --git a/pubspec.yaml b/pubspec.yaml
+index b541b8b..18c6d91 100644
+--- a/pubspec.yaml
++++ b/pubspec.yaml
+@@ -1,7 +1,7 @@
+ name: dropify
+ description: A Pixeldrain Client.
+ publish_to: 'none'
+-version: 1.5.1+10
++version: 1.5.2+11
+ 
+ environment:
+   sdk: '>=3.0.0 <4.0.0'
+-- 
+2.34.1
+

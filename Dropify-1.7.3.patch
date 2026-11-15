@@ -1,0 +1,122 @@
+From d138c02cf8df5a4e2d81539572866439c9794020 Mon Sep 17 00:00:00 2001
+From: Dropify Bot <bot@dropify.local>
+Date: Sun, 15 Nov 2026 09:15:21 +0000
+Subject: [PATCH] =?UTF-8?q?release:=20v1.7.3=20(versionCode=2019)=20?=
+ =?UTF-8?q?=E2=80=94=20unggah=20Gofile=20lewat=20WebView=20pakai=20pemilih?=
+ =?UTF-8?q?=20berkas?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- gofile_web_screen: AndroidWebViewController.setOnShowFileSelector
+  disambungkan ke FilePicker aplikasi, jadi tombol "Select files" /
+  input type=file di halaman Gofile benar-benar membuka pemilih berkas dan
+  mengembalikan path-nya ke WebView (sebelumnya callback bawaan hanya
+  mengembalikan daftar kosong, tombolnya diam).
+- Mendukung mode open dan openMultiple; batal memilih = daftar kosong.
+- pubspec: webview_flutter_android jadi dependensi langsung (4.14.1, versi
+  yang sudah terkunci).
+---
+ lib/screens/gofile_web_screen.dart | 33 ++++++++++++++++++++++++++++++
+ pubspec.lock                       |  2 +-
+ pubspec.yaml                       |  3 ++-
+ 3 files changed, 36 insertions(+), 2 deletions(-)
+
+diff --git a/lib/screens/gofile_web_screen.dart b/lib/screens/gofile_web_screen.dart
+index 3b18751..e557ed7 100644
+--- a/lib/screens/gofile_web_screen.dart
++++ b/lib/screens/gofile_web_screen.dart
+@@ -1,9 +1,11 @@
+ import 'dart:async';
+ import 'dart:convert';
+ 
++import 'package:file_picker/file_picker.dart';
+ import 'package:flutter/material.dart';
+ import 'package:flutter/services.dart';
+ import 'package:webview_flutter/webview_flutter.dart';
++import 'package:webview_flutter_android/webview_flutter_android.dart';
+ 
+ import '../l10n/locale_controller.dart';
+ import '../models/pd_item.dart';
+@@ -26,6 +28,9 @@ import '../widgets/kit.dart';
+ ///
+ /// Hasilnya tampil di pill progres HomeTab dan sheet Transfers, dengan
+ /// notifikasi sistem dari TransferService seperti unduhan Pixeldrain.
++///
++/// Unggah lewat tombol "Select files" di halaman Gofile memakai pemilih berkas
++/// Android aplikasi ([FilePicker]); tanpa ini WebView tidak membuka apa pun.
+ class GofileWebScreen extends StatefulWidget {
+   const GofileWebScreen({super.key, this.url, this.token});
+ 
+@@ -77,6 +82,34 @@ class _GofileWebScreenState extends State<GofileWebScreen> {
+         ),
+       )
+       ..loadRequest(Uri.parse(_startUrl));
++
++    _attachFileChooser();
++  }
++
++  /// Sambungkan pemilih berkas WebView ke pemilih berkas aplikasi, supaya
++  /// unggahan Gofile (input type=file) benar-benar bisa memilih berkas.
++  void _attachFileChooser() {
++    final platform = _web.platform;
++    if (platform is AndroidWebViewController) {
++      unawaited(platform.setOnShowFileSelector(_onShowFileSelector));
++    }
++  }
++
++  Future<List<String>> _onShowFileSelector(FileSelectorParams params) async {
++    try {
++      final result = await FilePicker.platform.pickFiles(
++        allowMultiple: params.mode == FileSelectorMode.openMultiple,
++        type: FileType.any,
++        withData: false,
++      );
++      if (result == null) return const <String>[];
++      return <String>[
++        for (final file in result.files)
++          if (file.path != null && file.path!.isNotEmpty) file.path!,
++      ];
++    } catch (_) {
++      return const <String>[];
++    }
+   }
+ 
+   @override
+diff --git a/pubspec.lock b/pubspec.lock
+index 03c7759..ccd2cea 100644
+--- a/pubspec.lock
++++ b/pubspec.lock
+@@ -515,7 +515,7 @@ packages:
+     source: hosted
+     version: "4.14.1"
+   webview_flutter_android:
+-    dependency: transitive
++    dependency: "direct main"
+     description:
+       name: webview_flutter_android
+       sha256: "4de8b3d1ff4ebe1bdb42e68a5e4f809194a3cb0117a8f495f590004f00da3964"
+diff --git a/pubspec.yaml b/pubspec.yaml
+index a7ac707..64bad75 100644
+--- a/pubspec.yaml
++++ b/pubspec.yaml
+@@ -1,7 +1,7 @@
+ name: dropify
+ description: A Pixeldrain Client.
+ publish_to: 'none'
+-version: 1.7.2+18
++version: 1.7.3+19
+ 
+ environment:
+   sdk: '>=3.0.0 <4.0.0'
+@@ -20,6 +20,7 @@ dependencies:
+   intl: ^0.20.3
+   url_launcher: ^6.3.0
+   webview_flutter: ^4.10.0
++  webview_flutter_android: ^4.14.1
+ 
+ dev_dependencies:
+   flutter_test:
+-- 
+2.34.1
+

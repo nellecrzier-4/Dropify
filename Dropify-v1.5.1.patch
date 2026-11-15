@@ -1,0 +1,223 @@
+From 74077a6c36c8fe27b7c3f2f2c891559c484b973e Mon Sep 17 00:00:00 2001
+From: design-bot <design@local>
+Date: Sun, 15 Nov 2026 07:24:49 +0000
+Subject: [PATCH] =?UTF-8?q?release:=20v1.5.1=20(versionCode=2010)=20?=
+ =?UTF-8?q?=E2=80=94=20Gofile=20token=20API?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ lib/l10n/app_strings.dart      | 24 ++++++++++++
+ lib/screens/gofile_screen.dart | 32 +++++++++++++--
+ lib/services/gofile_api.dart   | 72 ++++++++++++++++++++++++++++------
+ pubspec.yaml                   |  2 +-
+ 4 files changed, 114 insertions(+), 16 deletions(-)
+
+diff --git a/lib/l10n/app_strings.dart b/lib/l10n/app_strings.dart
+index ee65974..f30031d 100644
+--- a/lib/l10n/app_strings.dart
++++ b/lib/l10n/app_strings.dart
+@@ -47,6 +47,8 @@ abstract class AppStrings {
+   String get gofilePasteHint;
+   String get gofileGuestNote;
+   String get gofileEmpty;
++  String get gofileTokenNeeded;
++  String get gofilePremiumNeeded;
+   String get noAccount;
+   String get preparingSession;
+   String get fillCredentials;
+@@ -1021,6 +1023,17 @@ class StringsId extends AppStrings {
+   @override
+   String get gofileEmpty => 'Belum ada file di akun Gofile ini.';
+ 
++
++  @override
++  String get gofileTokenNeeded =>
++      'Tautan login dari email tidak bisa dipakai langsung oleh aplikasi. '
++      'Buka gofile.io → Profile → API token, lalu tempel token itu di sini.';
++
++  @override
++  String get gofilePremiumNeeded =>
++      'Daftar file akun Gofile hanya tersedia untuk akun premium '
++      '(API membalas error-notPremium).';
++
+ }
+ 
+ class StringsEn extends AppStrings {
+@@ -1779,4 +1792,15 @@ class StringsEn extends AppStrings {
+   @override
+   String get gofileEmpty => 'No files in this Gofile account yet.';
+ 
++
++  @override
++  String get gofileTokenNeeded =>
++      'The sign-in link from the email cannot be used by the app directly. '
++      'Open gofile.io → Profile → API token, then paste that token here.';
++
++  @override
++  String get gofilePremiumNeeded =>
++      'Listing your Gofile account files requires a premium account '
++      '(the API answers error-notPremium).';
++
+ }
+diff --git a/lib/screens/gofile_screen.dart b/lib/screens/gofile_screen.dart
+index 7fd7070..8c78846 100644
+--- a/lib/screens/gofile_screen.dart
++++ b/lib/screens/gofile_screen.dart
+@@ -306,9 +306,20 @@ class _LoginBody extends StatelessWidget {
+         ),
+         if (controller.error != null) ...[
+           const SizedBox(height: 14),
+-          Text(
+-            controller.error!,
+-            style: TextStyle(color: scheme.error, fontSize: 13),
++          Container(
++            padding: const EdgeInsets.all(14),
++            decoration: BoxDecoration(
++              color: scheme.errorContainer,
++              borderRadius: BorderRadius.circular(AppRadii.md),
++            ),
++            child: Text(
++              _errorText(context, controller.error!),
++              style: TextStyle(
++                color: scheme.onErrorContainer,
++                fontSize: 13,
++                height: 1.4,
++              ),
++            ),
+           ),
+         ],
+       ],
+@@ -316,6 +327,21 @@ class _LoginBody extends StatelessWidget {
+   }
+ }
+ 
++String _errorText(BuildContext context, String code) {
++  final s = context.s;
++  switch (code) {
++    case 'butuh_api_token':
++    case 'token_tidak_valid':
++      return s.gofileTokenNeeded;
++    case 'error-notPremium':
++      return s.gofilePremiumNeeded;
++    case 'error-accountId':
++      return s.gofileTokenNeeded;
++    default:
++      return s.downloadFailedSnack('Gofile', code);
++  }
++}
++
+ class _FileBody extends StatelessWidget {
+   const _FileBody({
+     required this.controller,
+diff --git a/lib/services/gofile_api.dart b/lib/services/gofile_api.dart
+index 82812bc..f82b9b2 100644
+--- a/lib/services/gofile_api.dart
++++ b/lib/services/gofile_api.dart
+@@ -1,3 +1,5 @@
++import 'dart:convert';
++
+ import 'package:dio/dio.dart';
+ 
+ /// Klien API Gofile (https://gofile.io/api).
+@@ -32,14 +34,53 @@ class GofileApi {
+     }
+   }
+ 
+-  /// Ambil info akun dari token.
+-  Future<GofileAccount> account(String token) async {
+-    final res = await _dio.get<Map<String, dynamic>>(
+-      '/accounts',
+-      options: Options(headers: _auth(token)),
+-    );
+-    final data = _data(res);
+-    return GofileAccount.fromJson(data, fallbackToken: token);
++  /// Ambil info akun dari token. Endpoint Gofile butuh account id di path,
++  /// jadi id diambil dari klaim di dalam token (JWT) kalau ada.
++  Future<GofileAccount> account(String token, {String? accountId}) async {
++    final id = accountId ?? accountIdFromToken(token);
++    if (id == null) throw GofileException('butuh_api_token');
++    try {
++      final res = await _dio.get<Map<String, dynamic>>(
++        '/accounts/$id',
++        options: Options(headers: _auth(token)),
++      );
++      final data = _data(res);
++      return GofileAccount.fromJson(data, fallbackToken: token);
++    } on DioException catch (e) {
++      throw GofileException(
++        _apiCode(e) ?? 'HTTP ${e.response?.statusCode ?? 0}',
++      );
++    }
++  }
++
++  /// Baca account id dari payload JWT (token API dari halaman profil Gofile).
++  static String? accountIdFromToken(String token) {
++    final parts = token.split('.');
++    if (parts.length != 3) return null;
++    try {
++      var payload = parts[1].replaceAll('-', '+').replaceAll('_', '/');
++      while (payload.length % 4 != 0) {
++        payload += '=';
++      }
++      final json = utf8.decode(base64.decode(payload));
++      final map = jsonDecode(json);
++      if (map is! Map) return null;
++      for (final key in const ['id', 'accountId', 'account', 'sub', 'aid']) {
++        final value = map[key];
++        if (value is String && value.length >= 8) return value;
++      }
++    } catch (_) {
++      return null;
++    }
++    return null;
++  }
++
++  String? _apiCode(DioException e) {
++    final data = e.response?.data;
++    if (data is Map && data['status'] is String) {
++      return data['status'] as String;
++    }
++    return null;
+   }
+ 
+   /// Daftar isi folder (root memakai `rootFolder` dari akun).
+@@ -47,10 +88,17 @@ class GofileApi {
+     String folderId,
+     String token,
+   ) async {
+-    final res = await _dio.get<Map<String, dynamic>>(
+-      '/contents/$folderId',
+-      queryParameters: {'token': token, 'pageSize': 1000},
+-    );
++    late final Response<Map<String, dynamic>> res;
++    try {
++      res = await _dio.get<Map<String, dynamic>>(
++        '/contents/$folderId',
++        queryParameters: {'token': token, 'pageSize': 1000},
++      );
++    } on DioException catch (e) {
++      throw GofileException(
++        _apiCode(e) ?? 'HTTP ${e.response?.statusCode ?? 0}',
++      );
++    }
+     final data = _data(res);
+     final children = data['children'];
+     final entries = <GofileEntry>[];
+diff --git a/pubspec.yaml b/pubspec.yaml
+index 190f479..b541b8b 100644
+--- a/pubspec.yaml
++++ b/pubspec.yaml
+@@ -1,7 +1,7 @@
+ name: dropify
+ description: A Pixeldrain Client.
+ publish_to: 'none'
+-version: 1.5.0+9
++version: 1.5.1+10
+ 
+ environment:
+   sdk: '>=3.0.0 <4.0.0'
+-- 
+2.34.1
+
