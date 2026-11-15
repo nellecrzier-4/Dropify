@@ -1148,23 +1148,35 @@ class DownloadService extends ChangeNotifier {
     task.size = lengthHeader != null ? lengthHeader + start : 0;
     task.received = start;
 
-    final sink = part.openWrite(
+    // Tulis lewat RandomAccessFile dan TUNGGU setiap kali, bukan lewat IOSink
+    // tanpa backpressure: kalau jaringan lebih cepat dari penyimpanan (FUSE),
+    // IOSink menumpuk seluruh unduhan di memori sampai proses dibunuh sistem.
+    final raf = await part.open(
       mode: resuming ? FileMode.append : FileMode.write,
     );
 
     var received = start;
+    final pending = BytesBuilder(copy: false);
+    Future<void> writePending() async {
+      if (pending.length == 0) return;
+      final bytes = pending.takeBytes();
+      await raf.writeFrom(bytes);
+    }
+
     try {
       await for (final chunk in response.data!.stream) {
         if (task.canceled) {
           throw _RetryableError('dibatalkan');
         }
-        sink.add(chunk);
+        pending.add(chunk);
         received += chunk.length;
+        if (pending.length >= 512 * 1024) await writePending();
         _reportProgress(task, received);
       }
-      await sink.flush();
+      await writePending();
+      await raf.flush();
     } finally {
-      await sink.close();
+      await raf.close();
     }
 
     if (task.size > 0 && received < task.size) {
