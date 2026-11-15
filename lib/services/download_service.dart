@@ -261,6 +261,9 @@ class DownloadService extends ChangeNotifier {
         : (fileId.isNotEmpty ? 'id:$fileId' : 'fs:${item.fsPath.join('/')}');
     for (final t in tasks) {
       if (t.key == key && t.isActive) return t;
+      // Halaman Gofile bisa memicu tautan baru untuk berkas yang sama; jangan
+      // sampai satu berkas berjalan sebagai beberapa unduhan sekaligus.
+      if (urlOverride != null && t.isActive && t.name == item.name) return t;
     }
 
     final task = DownloadTask(
@@ -289,8 +292,11 @@ class DownloadService extends ChangeNotifier {
     }
 
     if (urlOverride != null && _useSystemDownloader) {
-      final handled = await _runNativeDownload(task, urlOverride, headers);
-      if (handled) return task;
+      // Dua-duanya berjalan di luar Dart. DownloadManager lebih kuat: proses
+      // sistem yang tetap jalan walau aplikasi ditutup. Kalau tidak tersedia,
+      // FileDownloader native dipakai (juga tanpa menulis dari Dart).
+      if (await _runSystemDownload(task, urlOverride, headers)) return task;
+      if (await _runNativeDownload(task, urlOverride, headers)) return task;
       task
         ..status = DownloadStatus.error
         ..error = _s.downloaderUnavailable
@@ -307,6 +313,112 @@ class DownloadService extends ChangeNotifier {
   ///
   /// Mengembalikan false hanya kalau enqueue gagal total (mis. kanal native
   /// tidak ada), supaya pemanggil bisa memakai downloader di dalam app.
+  /// Serahkan unduhan ke DownloadManager Android (proses sistem).
+  ///
+  /// Ini isolasi terkuat: berkas ditulis oleh sistem, bukan proses aplikasi,
+  /// jadi unduhan tetap berjalan walau Dropify ditutup dan memori aplikasi
+  /// tidak tersentuh. Mengembalikan false hanya kalau enqueue ditolak.
+  Future<bool> _runSystemDownload(
+    DownloadTask task,
+    String url,
+    Map<String, String> headers,
+  ) async {
+    NativeDownloadHandle handle;
+    try {
+      handle = await NativeDownloads.enqueue(
+        url: url,
+        name: task.name,
+        headers: headers,
+      );
+    } catch (e) {
+      _log('native', '${task.name}: enqueue gagal ($e)');
+      return false;
+    }
+
+    task
+      ..status = DownloadStatus.downloading
+      ..viaSystem = true
+      ..path = handle.path
+      ..startedAt = DateTime.now()
+      ..url = url;
+    _log('native', '${task.name}: DownloadManager #${handle.id}');
+    _notify();
+
+    var lastReceived = 0;
+    var lastTime = DateTime.now();
+    var missing = 0;
+
+    while (!_disposed) {
+      if (task.canceled) {
+        await NativeDownloads.cancel(handle.id);
+        return true;
+      }
+      await Future<void>.delayed(const Duration(seconds: 1));
+      final state = await NativeDownloads.query(handle.id);
+      if (state == null) {
+        if (++missing >= 3) {
+          task
+            ..status = DownloadStatus.error
+            ..error = _s.downloaderUnavailable
+            ..endedAt = DateTime.now();
+          _notify();
+          return true;
+        }
+        continue;
+      }
+      missing = 0;
+
+      if (state.total > 0) task.size = state.total;
+      task.received = state.received;
+      final now = DateTime.now();
+      final seconds = now.difference(lastTime).inSeconds;
+      if (seconds >= 1) {
+        final delta = state.received - lastReceived;
+        task.speed = delta <= 0 ? 0 : delta / seconds;
+        lastReceived = state.received;
+        lastTime = now;
+      }
+      _notify();
+
+      if (state.isDone) {
+        task
+          ..status = DownloadStatus.done
+          ..received = task.size > 0 ? task.size : state.received
+          ..speed = 0
+          ..endedAt = DateTime.now();
+        _log('native', '${task.name}: selesai ${task.received} byte');
+        DownloadHistory.instance.add(
+          DownloadRecord(
+            name: task.name,
+            path: task.path ?? '',
+            size: task.received,
+            time: DateTime.now(),
+          ),
+        );
+        NativeDownloads.notifyDownload(
+          id: task.notifyId,
+          title: task.name,
+          text: formatSize(task.received),
+          progress: 1,
+          done: true,
+        );
+        _notify();
+        return true;
+      }
+      if (state.isFailed) {
+        task
+          ..status = DownloadStatus.error
+          ..error = state.error ?? _s.downloadFailed
+          ..speed = 0
+          ..endedAt = DateTime.now();
+        _log('native', '${task.name}: gagal ${task.error}');
+        _notify();
+        return true;
+      }
+    }
+    return true;
+  }
+
   /// Unduhan URL luar dijalankan sepenuhnya oleh kode native
   /// ([FileDownloader]) — Dart hanya menerima kejadian progres. Dengan begitu
   /// memori aplikasi tidak tumbuh mengikuti ukuran berkas, dan WebView tidak
