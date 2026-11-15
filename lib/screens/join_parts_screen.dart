@@ -17,7 +17,25 @@ class _PartGroup {
   final String extension;
   final List<File> files;
 
-  int get totalSize => files.fold(0, (sum, f) => sum + f.lengthSync());
+  /// Jumlah ukuran bagian yang benar-benar ada. Berkas bisa hilang (dihapus,
+  /// dipindah, atau unduhan gagal) — jangan sampai layar ikut gagal dibangun.
+  int get totalSize => files.fold(0, (sum, f) {
+        try {
+          if (!f.existsSync()) return sum;
+          return sum + f.lengthSync();
+        } catch (_) {
+          return sum;
+        }
+      });
+
+  /// true kalau semua bagian masih ada di disk.
+  bool get complete => files.every((f) {
+        try {
+          return f.existsSync();
+        } catch (_) {
+          return false;
+        }
+      });
   int get count => files.length;
   String get outputName => '$base$extension';
 }
@@ -331,7 +349,9 @@ class _JoinPartsScreenState extends State<JoinPartsScreen> {
                                               ),
                                               const SizedBox(height: 3),
                                               Text(
-                                                '${group.count} ${s.parts} · ${formatSize(group.totalSize)}',
+                                                '${group.count} ${s.parts} · '
+                                                '${formatSize(group.totalSize)}'
+                                                '${group.complete ? '' : ' · ada bagian hilang'}',
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
                                                 style: TextStyle(
