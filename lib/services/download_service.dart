@@ -149,8 +149,41 @@ const Map<String, String> _browserHeaders = {
   'User-Agent':
       'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 '
           '(KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
-  'Referer': 'https://pixeldrain.com/',
+  'Accept-Language': 'en-US,en;q=0.9,id;q=0.8',
+  'Sec-Fetch-Dest': 'empty',
+  'Sec-Fetch-Mode': 'cors',
+  'Sec-Fetch-Site': 'same-site',
 };
+
+/// Header permintaan yang menyerupai browser yang membuka halaman berkas itu
+/// sendiri: proteksi hotlink Pixeldrain menolak referer yang tidak wajar,
+/// jadi Referer/Origin diarahkan ke halaman berkasnya.
+Map<String, String> _pageHeaders(String url) {
+  final id = _fileIdFromUrl(url);
+  final referer =
+      id != null ? 'https://pixeldrain.com/u/$id' : 'https://pixeldrain.com/';
+  return {
+    ..._browserHeaders,
+    'Referer': referer,
+    'Origin': 'https://pixeldrain.com',
+  };
+}
+
+/// Id berkas dari URL API (`/api/file/<id>?download`) atau halaman `/u/<id>`.
+String? _fileIdFromUrl(String url) => fileIdFromUrl(url);
+
+@visibleForTesting
+String? fileIdFromUrl(String url) {
+  final uri = Uri.tryParse(url);
+  if (uri == null) return null;
+  final parts = uri.pathSegments;
+  if (parts.contains('filesystem')) return null;
+  for (final key in const ['u', 'file']) {
+    final i = parts.indexOf(key);
+    if (i >= 0 && parts.length > i + 1) return parts[i + 1];
+  }
+  return null;
+}
 
 /// Server mengabaikan header Range (balas 200, bukan 206).
 class _RangeUnsupported implements Exception {}
@@ -1114,7 +1147,7 @@ class DownloadService extends ChangeNotifier {
           url,
           options: Options(
             headers: {
-              ..._browserHeaders,
+              ..._pageHeaders(url),
               'Accept': '*/*',
               'Range': 'bytes=$from-${chunk.end}',
               ...task.extraHeaders,
@@ -1234,7 +1267,7 @@ class DownloadService extends ChangeNotifier {
       start = 0;
     }
 
-    final headers = <String, String>{..._browserHeaders, 'Accept': '*/*'};
+    final headers = <String, String>{..._pageHeaders(url), 'Accept': '*/*'};
     if (start > 0) headers['Range'] = 'bytes=$start-';
     headers.addAll(task.extraHeaders);
     if (!task.viaBypass) headers.addAll(task.directHeaders);
@@ -1442,7 +1475,7 @@ class DownloadService extends ChangeNotifier {
       final res = await _dio.head(
         url,
         options: Options(
-          headers: {..._browserHeaders, ...headers, 'Accept': '*/*'},
+          headers: {..._pageHeaders(url), ...headers, 'Accept': '*/*'},
           receiveTimeout: const Duration(seconds: 15),
           validateStatus: (_) => true,
         ),
@@ -1462,17 +1495,21 @@ class DownloadService extends ChangeNotifier {
         );
       }
       if (code == 429 || code == 403) {
-        // Batas harian / pemblokiran sementara: coba proxy berikutnya.
+        // 403 juga bisa berarti proteksi hotlink: coba sekali dengan header
+        // halaman berkas sebelum memutar proxy.
+        if (code == 403) {
+          final retry = await _probeRange(url, headers);
+          if (retry.ok) return retry;
+        }
         if (ProxyService.instance.rotate()) {
           _log('proxy', 'putar ke ${ProxyService.instance.current} (HTTP $code)');
-          return _probeWithNetwork(url, headers);
+          return await _probeWithNetwork(url, headers);
         }
         return ProbeResult.fail(code == 429 ? 'rate_limited' : 'HTTP $code');
       }
-      if (code == 400 || code == 403 || code == 405 || code == 501) {
-        // Sebagian server menolak HEAD atau request tanpa header browser;
-        // coba GET dengan Range 0-0.
-        return _probeRange(url, headers);
+      if (code == 400 || code == 405 || code == 501) {
+        // Sebagian server menolak HEAD; coba GET dengan Range 0-0.
+        return await _probeRange(url, headers);
       }
       return ProbeResult.fail('HTTP $code');
     } on DioException catch (e) {
@@ -1489,7 +1526,7 @@ class DownloadService extends ChangeNotifier {
         url,
         options: Options(
           headers: {
-            ..._browserHeaders,
+            ..._pageHeaders(url),
             ...headers,
             'Accept': '*/*',
             'Range': 'bytes=0-0',
