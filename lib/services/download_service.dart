@@ -403,6 +403,16 @@ class DownloadService extends ChangeNotifier {
         return;
       }
       task.bypassError = last?.error ?? 'gagal';
+      if (task.bypassError == 'rate_limited') {
+        task
+          ..status = DownloadStatus.error
+          ..error = 'pixeldrain_rate_limited'
+          ..speed = 0
+          ..endedAt = DateTime.now();
+        NativeDownloads.cancelNotification(task.notifyId);
+        _notify();
+        return;
+      }
     }
 
     final directProbe = await _probeUrl(task.directUrl, task.directHeaders);
@@ -420,11 +430,15 @@ class DownloadService extends ChangeNotifier {
     }
 
     final directError = directProbe.error ?? 'gagal';
+    final rateLimited =
+        directError == 'rate_limited' || task.bypassError == 'rate_limited';
     task
       ..status = DownloadStatus.error
-      ..error = task.bypassError == null
-          ? 'Pixeldrain: $directError'
-          : 'Bypass: ${task.bypassError} · Pixeldrain: $directError'
+      ..error = rateLimited
+          ? 'pixeldrain_rate_limited'
+          : (task.bypassError == null
+              ? 'Pixeldrain: $directError'
+              : 'Bypass: ${task.bypassError} · Pixeldrain: $directError')
       ..endedAt = DateTime.now();
     _notify();
   }
@@ -1000,20 +1014,27 @@ class DownloadService extends ChangeNotifier {
     Map<String, String> headers,
   ) async {
     try {
-      final res = await _dio.get<ResponseBody>(
+      final res = await _dio.get<String>(
         url,
         options: Options(
-          headers: {...headers, 'Accept': '*/*', 'Range': 'bytes=0-0'},
-          responseType: ResponseType.stream,
+          headers: {
+            ..._browserHeaders,
+            ...headers,
+            'Accept': '*/*',
+            'Range': 'bytes=0-0',
+          },
+          responseType: ResponseType.plain,
           validateStatus: (_) => true,
         ),
       );
-      final body = res.data;
-      if (body is ResponseBody) {
-        unawaited(body.stream.listen(null).cancel());
-      }
       final code = res.statusCode ?? 0;
       if (code != 200 && code != 206) {
+        final body = (res.data ?? '').toLowerCase();
+        if (body.contains('captcha_required') ||
+            body.contains('rate_limited') ||
+            body.contains('hotlink')) {
+          return ProbeResult.fail('rate_limited');
+        }
         return ProbeResult.fail('HTTP $code');
       }
       final contentRange = res.headers.value('content-range') ?? '';
@@ -1028,7 +1049,7 @@ class DownloadService extends ChangeNotifier {
       return ProbeResult.ok(
         res.realUri.toString(),
         size: size,
-        ranges: code == 206,
+        ranges: contentRange.isNotEmpty,
       );
     } on DioException catch (e) {
       return ProbeResult.fail(e.message ?? e.type.name);

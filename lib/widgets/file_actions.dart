@@ -10,6 +10,7 @@ import '../services/download_service.dart';
 import '../services/native_downloads.dart';
 import '../services/pixeldrain_bypass.dart';
 import '../theme/app_theme.dart';
+import '../utils/errors.dart';
 import '../utils/file_types.dart';
 import 'kit.dart';
 import 'motion.dart';
@@ -73,9 +74,7 @@ Future<void> downloadItem(
   if (task.status == DownloadStatus.error) {
     text = s.downloadFailedSnack(
       task.name,
-      task.error == 'storage_permission'
-          ? s.storagePermission
-          : (task.error ?? ''),
+      describeDownloadError(context, task.error),
     );
   } else if (!task.isActive && task.status == DownloadStatus.done) {
     text = '${task.name} ${s.alreadyDownloaded}';
@@ -85,7 +84,8 @@ Future<void> downloadItem(
     text = s.downloadStartedSnack(task.name);
   }
 
-  final forbidden = task.error?.contains('403') ?? false;
+  final forbidden = (task.error?.contains('403') ?? false) ||
+      task.error == 'pixeldrain_rate_limited';
   final fileId = (item.id ?? '').trim();
 
   showAppSnack(

@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../controllers/drive_controller.dart';
 import '../l10n/app_strings.dart';
 import '../l10n/locale_controller.dart';
+import '../utils/errors.dart';
 import '../screens/settings_screen.dart';
 import '../services/download_service.dart';
 import '../services/native_downloads.dart';
@@ -363,9 +364,10 @@ class _DownloadsTab extends StatelessWidget {
                         ),
                         const SizedBox(height: 3),
                         Text(
-                          task.error == 'storage_permission'
-                              ? s.storagePermission
-                              : (task.error ?? s.downloadDetails),
+                          describeDownloadError(
+                            context,
+                            task.error ?? s.downloadDetails,
+                          ),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
@@ -430,7 +432,7 @@ class _DownloadsTab extends StatelessWidget {
     }
   }
 
-  String _subtitle(AppStrings s, DownloadTask t) {
+  String _subtitle(BuildContext context, AppStrings s, DownloadTask t) {
     switch (t.status) {
       case DownloadStatus.preparing:
         return s.preparingLink;
@@ -448,7 +450,9 @@ class _DownloadsTab extends StatelessWidget {
         return s.canceled;
       case DownloadStatus.error:
         return s.failedDetail(
-          t.error == 'storage_permission' ? s.storagePermission : (t.error ?? '—'),
+          describeDownloadError(context, t.error).isEmpty
+              ? '—'
+              : describeDownloadError(context, t.error),
         );
     }
   }
@@ -498,7 +502,7 @@ class _DownloadsTab extends StatelessWidget {
           title: t.name,
           progress: t.status == DownloadStatus.downloading ? t.progress : null,
           subtitle: Text(
-            _subtitle(s, t),
+            _subtitle(context, s, t),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(

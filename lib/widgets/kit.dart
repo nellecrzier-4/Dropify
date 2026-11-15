@@ -408,41 +408,73 @@ class GlowIcon extends StatelessWidget {
 }
 
 /// Orb besar untuk empty state / onboarding.
-class OrbIcon extends StatelessWidget {
+class OrbIcon extends StatefulWidget {
   const OrbIcon({
     super.key,
     required this.icon,
     this.size = 96,
     this.color,
     this.iconSize,
+    this.animate = true,
   });
 
   final IconData icon;
   final double size;
   final Color? color;
   final double? iconSize;
+  final bool animate;
+
+  @override
+  State<OrbIcon> createState() => _OrbIconState();
+}
+
+class _OrbIconState extends State<OrbIcon>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2600),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.animate) _c.repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final scheme = AppColors.scheme;
-    final tint = color ?? scheme.primary;
+    final tint = widget.color ?? AppColors.scheme.primary;
+    final size = widget.size;
 
     return SizedBox(
       width: size,
       height: size,
       child: Center(
-        child: Container(
-          width: size * 0.78,
-          height: size * 0.78,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: tint.withValues(alpha: 0.14),
+        child: AnimatedBuilder(
+          animation: _c,
+          builder: (context, child) => Transform.scale(
+            scale: 1 + 0.035 * Curves.easeInOut.transform(_c.value),
+            child: child,
           ),
-          child: Center(
-            child: Icon(
-              icon,
-              size: iconSize ?? size * 0.34,
-              color: tint,
+          child: Container(
+            width: size * 0.78,
+            height: size * 0.78,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: tint.withValues(alpha: 0.14),
+            ),
+            child: Center(
+              child: Icon(
+                widget.icon,
+                size: widget.iconSize ?? size * 0.34,
+                color: tint,
+              ),
             ),
           ),
         ),

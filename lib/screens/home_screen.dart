@@ -74,8 +74,11 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  bool _addOpen = false;
+
   Future<void> _showAddMenu() async {
     final s = context.s;
+    setState(() => _addOpen = true);
     await showExpressiveSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -102,6 +105,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
+    if (mounted) setState(() => _addOpen = false);
   }
 
   Future<void> _upload() async {
@@ -172,7 +176,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Positioned(
             right: 20,
             bottom: 92 + safeBottom,
-            child: _AddFab(onTap: _showAddMenu),
+            child: _AddFab(onTap: _showAddMenu, open: _addOpen),
           ),
         ],
       ),
@@ -183,9 +187,10 @@ class _HomeScreenState extends State<HomeScreen> {
 /// Tombol aksi melayang M3: tonal (primary container), sudut 18, bayangan
 /// lembut, dan mengecil saat ditekan.
 class _AddFab extends StatelessWidget {
-  const _AddFab({required this.onTap});
+  const _AddFab({required this.onTap, this.open = false});
 
   final VoidCallback onTap;
+  final bool open;
 
   @override
   Widget build(BuildContext context) {

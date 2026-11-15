@@ -258,11 +258,13 @@ class _AnimatedIndexedStackState extends State<AnimatedIndexedStack>
     value: 1,
   );
   late int _current = widget.index;
+  double _direction = 1;
 
   @override
   void didUpdateWidget(covariant AnimatedIndexedStack old) {
     super.didUpdateWidget(old);
     if (widget.index != _current) {
+      _direction = widget.index > _current ? 1 : -1;
       _current = widget.index;
       _c.forward(from: 0);
     }
@@ -292,7 +294,7 @@ class _AnimatedIndexedStackState extends State<AnimatedIndexedStack>
                   child: Transform.scale(
                     scale: 0.985 + 0.015 * t,
                     child: Transform.translate(
-                      offset: Offset(0, (1 - t) * 8),
+                      offset: Offset((1 - t) * 14 * _direction, 0),
                       child: child,
                     ),
                   ),

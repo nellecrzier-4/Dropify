@@ -132,6 +132,7 @@ abstract class AppStrings {
   String get copyLink;
   String get waitingNetwork;
   String get storagePermission;
+  String get downloadNeedsPlan;
   String get storagePermissionHint;
   String get downloadFromLink;
   String get linkHint;
@@ -570,6 +571,10 @@ class StringsId extends AppStrings {
   @override
   String get storagePermission =>
       'Butuh izin "Akses semua file" supaya bisa menyimpan ke Download/Dropify.';
+
+  @override
+  String get downloadNeedsPlan =>
+      'File ini dilindungi Pixeldrain (hotlink/captcha). Perlu langganan berbayar atau buka halaman file di browser.';
 
   @override
   String get storagePermissionHint =>
@@ -1129,6 +1134,10 @@ class StringsEn extends AppStrings {
   @override
   String get storagePermission =>
       'Needs "All files access" permission to save into Download/Dropify.';
+
+  @override
+  String get downloadNeedsPlan =>
+      'This file is protected by Pixeldrain (hotlink/captcha). A paid plan or the file page in a browser is required.';
 
   @override
   String get storagePermissionHint =>
