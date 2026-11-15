@@ -26,6 +26,11 @@ Future<void> main() async {
   );
   await AppSettings.instance.load();
   await DownloadHistory.instance.load();
+  // Berkas yang selesai tanpa aplikasi (mis. lewat DownloadManager) tetap
+  // muncul di riwayat saat aplikasi dibuka.
+  unawaited(
+    DownloadHistory.instance.syncFolder('/storage/emulated/0/Download/Dropify'),
+  );
   // Bersihkan sisa potongan upload dari sesi sebelumnya.
   unawaited(CacheCleaner.clearUploadParts());
   runApp(const DropifyApp());

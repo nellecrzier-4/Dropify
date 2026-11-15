@@ -108,6 +108,8 @@ void main() {
         folderOverride: dir.path,
         parallelMinSize: 16 * 1024 * 1024,
         minSegmentSize: 8 * 1024 * 1024,
+        // Uji penulis berkas aplikasi, bukan DownloadManager.
+        useSystemDownloader: false,
         probe: (url, headers) async =>
             ProbeResult.ok(url, size: _size, ranges: true),
       );

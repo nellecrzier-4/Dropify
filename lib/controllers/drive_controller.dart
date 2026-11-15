@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 
@@ -36,6 +37,8 @@ class DriveController extends ChangeNotifier {
     // Unduhan dari layar lain (WebView Gofile) memakai instance yang sama,
     // supaya pill HomeTab dan sheet Transfers menampilkannya.
     DownloadService.shared = downloads;
+    // Lanjutkan unduhan yang terputus saat aplikasi terakhir ditutup.
+    unawaited(downloads.restore());
   }
 
   final PixeldrainApi api;

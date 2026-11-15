@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -134,6 +135,50 @@ class DownloadHistory extends ChangeNotifier {
     if (items.length > maxItems) items.removeRange(maxItems, items.length);
     notifyListeners();
     await _persist();
+  }
+
+  /// Tambahkan berkas di folder unduhan yang belum tercatat.
+  ///
+  /// Kalau aplikasi dihentikan sistem di tengah unduhan, berkasnya bisa selesai
+  /// tanpa aplikasi (DownloadManager) — pemindaian ini membuatnya tetap muncul
+  /// di riwayat/Transfers saat aplikasi dibuka lagi.
+  Future<void> syncFolder(String folder) async {
+    try {
+      final dir = Directory(folder);
+      if (!await dir.exists()) return;
+      final known = items.map((r) => r.path).toSet();
+      final fresh = <File>[];
+      await for (final entity in dir.list()) {
+        if (entity is! File) continue;
+        if (entity.path.endsWith('.part')) continue;
+        if (known.contains(entity.path)) continue;
+        fresh.add(entity);
+      }
+      if (fresh.isEmpty) return;
+      final stats = <MapEntry<File, FileStat>>[];
+      for (final file in fresh) {
+        try {
+          stats.add(MapEntry(file, await file.stat()));
+        } catch (_) {}
+      }
+      stats.sort((a, b) => b.value.modified.compareTo(a.value.modified));
+      for (final entry in stats.take(20)) {
+        items.insert(
+          0,
+          DownloadRecord(
+            name: entry.key.path.split('/').last,
+            path: entry.key.path,
+            size: entry.value.size,
+            time: entry.value.modified,
+          ),
+        );
+      }
+      if (items.length > maxItems) items.removeRange(maxItems, items.length);
+      notifyListeners();
+      await _persist();
+    } catch (_) {
+      // Pemindaian bersifat pelengkap.
+    }
   }
 
   Future<void> remove(DownloadRecord record) async {

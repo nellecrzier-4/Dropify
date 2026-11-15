@@ -583,7 +583,8 @@ class _ActiveDownloadsCard extends StatelessWidget {
                 ? context.s.reconnecting
                 : '${formatSize(active.fold<int>(0, (a, t) => a + t.received))}'
                     ' / ${formatSize(active.fold<int>(0, (a, t) => a + t.size))}'
-                    ' · ${formatSize(active.first.speed.round())}/s',
+                    ' · ${formatSize(active.first.speed.round())}/s'
+                    '${active.any((t) => t.viaSystem) ? ' · sistem' : ''}',
             style: TextStyle(
               color: scheme.onSurfaceVariant,
               fontSize: 11.5,

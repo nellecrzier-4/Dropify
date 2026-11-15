@@ -3,7 +3,10 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../l10n/app_strings.dart';
 import '../l10n/locale_controller.dart';
@@ -60,6 +63,9 @@ class DownloadTask {
 
   /// Link yang benar-benar dipakai (sudah resolve redirect).
   String? url;
+
+  /// true kalau unduhan dipegang DownloadManager Android, bukan proses aplikasi.
+  bool viaSystem = false;
   bool viaBypass = false;
   String? bypassError;
   int attempts = 0;
@@ -226,11 +232,14 @@ class DownloadService extends ChangeNotifier {
   /// (mis. WebView Gofile) muncul di tempat yang sama.
   static DownloadService? shared;
 
+  static const String _resumeKey = 'dl_resume_v1';
+
   final List<DownloadTask> tasks = <DownloadTask>[];
 
   int _seq = 0;
   bool _disposed = false;
   DateTime _lastServiceUpdate = DateTime.fromMillisecondsSinceEpoch(0);
+  DateTime _lastResumeSave = DateTime.fromMillisecondsSinceEpoch(0);
 
   int get activeCount => tasks.where((t) => t.isActive).length;
   bool get hasActive => activeCount > 0;
@@ -326,6 +335,7 @@ class DownloadService extends ChangeNotifier {
 
     task
       ..status = DownloadStatus.downloading
+      ..viaSystem = true
       ..path = handle.path
       ..startedAt = DateTime.now()
       ..url = url;
@@ -400,6 +410,91 @@ class DownloadService extends ChangeNotifier {
       _notifyUi();
     }
     return true;
+  }
+
+  /// Simpan keadaan tugas yang belum selesai ke SharedPreferences.
+  ///
+  /// Kalau aplikasi dihentikan sistem di tengah unduhan 10 GB, saat dibuka
+  /// lagi tugasnya dibuat ulang dan melanjutkan dari byte terakhir.
+  Future<void> _saveResume() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final data = <Map<String, dynamic>>[
+        for (final t in tasks)
+          if (t.urlOverride != null && t.isActive && t.size > 0)
+            {
+              'key': t.key,
+              'name': t.name,
+              'url': t.urlOverride,
+              'size': t.size,
+              'received': t.received,
+              'headers': t.extraHeaders,
+            },
+      ];
+      if (data.isEmpty) {
+        await prefs.remove(_resumeKey);
+      } else {
+        await prefs.setString(_resumeKey, jsonEncode(data));
+      }
+    } catch (_) {
+      // Penyimpanan status tidak boleh mengganggu unduhan.
+    }
+  }
+
+  /// Buat ulang tugas yang terputus saat aplikasi ditutup, lalu lanjutkan.
+  Future<void> restore() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_resumeKey);
+      if (raw == null || raw.isEmpty) return;
+      final list = jsonDecode(raw) as List;
+      final resumed = <DownloadTask>[];
+      for (final entry in list) {
+        if (entry is! Map) continue;
+        final url = entry['url']?.toString() ?? '';
+        final key = entry['key']?.toString() ?? '';
+        if (url.isEmpty || key.isEmpty) continue;
+        if (tasks.any((t) => t.key == key && t.isActive)) continue;
+        final name = entry['name']?.toString() ?? 'file';
+        final headers = <String, String>{};
+        final rawHeaders = entry['headers'];
+        if (rawHeaders is Map) {
+          rawHeaders.forEach((k, v) {
+            headers['$k'] = '$v';
+          });
+        }
+        final task = DownloadTask(
+          id: 'dl${DateTime.now().microsecondsSinceEpoch}_${_seq}',
+          key: key,
+          item: PdItem(name: name, size: 0),
+          name: name,
+          directUrl: url,
+          directHeaders: api.authHeaders,
+          notifyId: 4200 + _seq++,
+          urlOverride: url,
+          extraHeaders: headers,
+        )..size = (entry['size'] as num?)?.toInt() ?? 0;
+        tasks.insert(0, task);
+        resumed.add(task);
+      }
+      await prefs.remove(_resumeKey);
+      if (resumed.isEmpty) return;
+      _log('resume', '${resumed.length} unduhan dilanjutkan');
+      _notify();
+      for (final task in resumed) {
+        unawaited(_resumeTask(task));
+      }
+    } catch (e) {
+      _log('resume', 'gagal: $e');
+    }
+  }
+
+  Future<void> _resumeTask(DownloadTask task) async {
+    if (!await _ensureStorage()) {
+      _fail(task, 'storage_permission');
+      return;
+    }
+    await _resolveAndRun(task);
   }
 
   /// Perbarui UI saja. DownloadManager punya notifikasi sendiri, jadi
@@ -952,9 +1047,14 @@ class DownloadService extends ChangeNotifier {
 
   int _workerCount(int size) {
     final max = AppSettings.instance.connections;
-    if (size >= 128 * 1024 * 1024) return max;
-    if (size >= 32 * 1024 * 1024) return (max - 2).clamp(2, max);
-    return (max - 4).clamp(2, max);
+    // Berkas raksasa: satu koneksi saja. Puluhan koneksi paralel untuk berkas
+    // 10 GB+ membuat memori dan I/O perangkat jenuh — aplikasi lalu dihentikan
+    // sistem. Satu koneksi yang ditulis berurutan jauh lebih tahan lama.
+    if (size >= 1024 * 1024 * 1024) return 1;
+    if (size >= 256 * 1024 * 1024) return 2;
+    if (size >= 64 * 1024 * 1024) return max.clamp(1, 4);
+    if (size >= 32 * 1024 * 1024) return (max - 2).clamp(1, max);
+    return (max - 4).clamp(1, max);
   }
 
   int _chunkSize(int size) {
@@ -1281,6 +1381,11 @@ class DownloadService extends ChangeNotifier {
     if (_disposed) return;
     _syncService();
     notifyListeners();
+    final now = DateTime.now();
+    if (now.difference(_lastResumeSave).inSeconds >= 5) {
+      _lastResumeSave = now;
+      unawaited(_saveResume());
+    }
   }
 
   /// Foreground service: hidup selama ada transfer, mati saat semua selesai.
