@@ -23,6 +23,9 @@ class ProxyService extends ChangeNotifier {
   /// Negara sumber proxy otomatis: Singapura, Indonesia, Jepang.
   static const List<String> autoCountries = ['SG', 'ID', 'JP'];
 
+  /// Jumlah maksimum proxy hasil uji yang disimpan untuk diputar.
+  static const int _maxPool = 16;
+
   static const String _autoFeed =
       'https://api.proxyscrape.com/v4/free-proxy-list/get'
       '?request=display_proxies&country={cc}&protocol=http'
@@ -104,9 +107,10 @@ class ProxyService extends ChangeNotifier {
         }
       }
       final verified = <String>[];
-      // Uji bertahap: cukup 4 proxy hidup untuk berputar.
+      // Uji bertahap sampai 16 proxy hidup, supaya putarannya panjang dan
+      // tidak cepat kembali ke IP yang sudah kena batas.
       const batch = 12;
-      for (var i = 0; i < candidates.length && verified.length < 4; i += batch) {
+      for (var i = 0; i < candidates.length && verified.length < _maxPool; i += batch) {
         final slice = candidates.skip(i).take(batch).toList();
         final results = await Future.wait(slice.map(_isAlive));
         for (var j = 0; j < slice.length; j++) {
@@ -191,6 +195,10 @@ class ProxyService extends ChangeNotifier {
     if (_proxies.isEmpty) {
       if (_autoPool.length < 2) return false;
       _autoIndex = (_autoIndex + 1) % _autoPool.length;
+      if (_autoIndex == 0) {
+        // Satu putaran penuh selesai: perbarui daftar di latar belakang.
+        unawaited(refreshAuto());
+      }
       notifyListeners();
       return true;
     }
