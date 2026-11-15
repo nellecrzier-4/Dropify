@@ -282,9 +282,19 @@ class _GofileBrowserState extends State<_GofileBrowser> {
                       const SizedBox(height: 10),
                       Text(
                         s.gofileEmpty,
+                        textAlign: TextAlign.center,
                         style: TextStyle(
                           color: scheme.onSurfaceVariant,
                           fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      SelectableText(
+                        ctrl.diagnostics,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: scheme.onSurfaceVariant.withValues(alpha: 0.7),
+                          fontSize: 10.5,
                         ),
                       ),
                     ],

@@ -21,6 +21,9 @@ class GofileApi {
 
   final Dio _dio;
 
+  /// Info mentah panggilan terakhir, dipakai layar untuk diagnosa.
+  String lastDebug = '';
+
   /// Minta tautan masuk dikirim ke [email].
   Future<void> requestLoginLink(String email) async {
     final res = await _dio.post<Map<String, dynamic>>(
@@ -121,6 +124,8 @@ class GofileApi {
         _apiCode(e) ?? 'HTTP ${e.response?.statusCode ?? 0}',
       );
     }
+    lastDebug = 'GET /contents/$folderId → ${res.statusCode} '
+        'status=${res.data?['status']}';
     final data = _data(res);
     // `children` bisa berupa map (id -> entry) atau list, tergantung versi API.
     final children = data['children'] ?? data['files'] ?? data['contents'];
@@ -138,6 +143,7 @@ class GofileApi {
         entries.add(GofileEntry.fromJson(Map<String, dynamic>.from(value)));
       }
     }
+    lastDebug += ' · children=${raw.length} · keys=${data.keys.join(',')}';
     entries.sort((a, b) {
       if (a.isDir != b.isDir) return a.isDir ? -1 : 1;
       return b.date.compareTo(a.date);

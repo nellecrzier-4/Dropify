@@ -112,7 +112,7 @@ class GofileController extends ChangeNotifier {
     if (account == null) return;
     try {
       _entries = await api.list(account.rootFolder, account.token);
-      _error = null;
+      _error = _entries.isEmpty ? 'kosong' : null;
     } catch (e) {
       _error = e is GofileException ? e.code : 'koneksi';
     }
@@ -153,6 +153,9 @@ class GofileController extends ChangeNotifier {
   }
 
   String? get shareId => _shareId;
+
+  /// Diagnosa panggilan terakhir (untuk layar Gofile).
+  String get diagnostics => api.lastDebug;
 
   Future<void> logout() async {
     _token = null;
