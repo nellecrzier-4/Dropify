@@ -23,20 +23,35 @@ class TransferService : Service() {
         private const val CHANNEL_ID = "dropify_transfer"
         private const val NOTIFICATION_ID = 7301
 
+        /** false kalau sistem menolak foreground service (kuota dataSync habis). */
+        @Volatile
+        var unavailable: Boolean = false
+
         fun start(context: Context, text: String) {
+            if (unavailable) return
             val intent = Intent(context, TransferService::class.java)
                 .putExtra("text", text)
-            if (Build.VERSION.SDK_INT >= 26) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
+            try {
+                if (Build.VERSION.SDK_INT >= 26) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+            } catch (e: Exception) {
+                unavailable = true
+                android.util.Log.w("Dropify", "foreground service ditolak: ${e.message}")
             }
         }
 
         fun update(context: Context, text: String) {
+            if (unavailable) return
             val intent = Intent(context, TransferService::class.java)
                 .putExtra("text", text)
-            context.startService(intent)
+            try {
+                context.startService(intent)
+            } catch (e: Exception) {
+                unavailable = true
+            }
         }
 
         fun stop(context: Context) {
@@ -56,8 +71,19 @@ class TransferService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val text = intent?.getStringExtra("text") ?: "Transfer berjalan"
-        startForeground(NOTIFICATION_ID, buildNotification(text))
-        return START_STICKY
+        return try {
+            startForeground(NOTIFICATION_ID, buildNotification(text))
+            START_STICKY
+        } catch (e: Exception) {
+            // ForegroundServiceStartNotAllowedException: kuota dataSync
+            // perangkat sudah habis. Jangan biarkan exception ini naik —
+            // dulu ia mematikan seluruh proses aplikasi. Transfer tetap
+            // berjalan selama aplikasi di depan.
+            unavailable = true
+            android.util.Log.w("Dropify", "startForeground ditolak: ${e.message}")
+            stopSelf()
+            START_NOT_STICKY
+        }
     }
 
     private fun buildNotification(text: String): Notification {
