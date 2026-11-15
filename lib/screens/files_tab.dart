@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
@@ -10,6 +12,7 @@ import '../widgets/file_tile.dart';
 import '../controllers/gofile_controller.dart';
 import '../services/download_service.dart';
 import '../services/gofile_api.dart';
+import '../services/gofile_start.dart';
 import '../utils/file_types.dart';
 import 'gofile_screen.dart';
 import 'gofile_web_screen.dart';
@@ -115,6 +118,27 @@ class _GofileBrowserState extends State<_GofileBrowser> {
   late final DownloadService _downloads = DownloadService(PixeldrainApi());
   final _link = TextEditingController();
 
+  /// Folder utama Gofile yang tersimpan, ditampilkan di kolom tautan supaya
+  /// tidak perlu diketik ulang.
+  String? _savedStart;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadSavedStart());
+  }
+
+  Future<void> _loadSavedStart() async {
+    final url = await GofileStart.load(widget.ctrl.token);
+    if (!mounted) return;
+    setState(() {
+      _savedStart = url;
+      if (url != null && _link.text.trim().isEmpty) {
+        _link.text = GofileStart.shortLink(url);
+      }
+    });
+  }
+
   @override
   void dispose() {
     _downloads.dispose();
@@ -128,6 +152,25 @@ class _GofileBrowserState extends State<_GofileBrowser> {
         builder: (_) => GofileWebScreen(url: url, token: widget.ctrl.token),
       ),
     );
+  }
+
+  /// Buka tautan di kolom: kalau isinya folder Gofile, simpan sebagai folder
+  /// utama supaya lain kali langsung ke sana.
+  Future<void> _openFromField(BuildContext context) async {
+    final text = _link.text.trim();
+    if (text.isEmpty) {
+      _openWeb(context, _savedStart);
+      return;
+    }
+    final url = GofileStart.normaliseInput(text) ??
+        (text.startsWith('http') ? text : 'https://gofile.io/d/$text');
+    if (GofileStart.isFolderPage(url)) {
+      await GofileStart.save(widget.ctrl.token, url);
+      if (!mounted) return;
+      setState(() => _savedStart = url);
+    }
+    if (!context.mounted) return;
+    _openWeb(context, url);
   }
 
   Widget _linkBar(BuildContext context, GofileController ctrl) {
@@ -149,19 +192,9 @@ class _GofileBrowserState extends State<_GofileBrowser> {
           ),
           const SizedBox(width: 8),
           IconButton.filledTonal(
-            onPressed: () {
-              // Gofile membatasi API untuk akun gratis; buka lewat web resmi
-              // di dalam app supaya isi tetap bisa diakses.
-              final text = _link.text.trim();
-              if (text.isEmpty) {
-                _openWeb(context);
-              } else {
-                _openWeb(
-                  context,
-                  text.startsWith('http') ? text : 'https://gofile.io/d/$text',
-                );
-              }
-            },
+            // Gofile membatasi API untuk akun gratis; buka lewat web resmi di
+            // dalam app supaya isi tetap bisa diakses.
+            onPressed: () => _openFromField(context),
             icon: const Icon(Icons.arrow_forward_rounded),
           ),
         ],

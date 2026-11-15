@@ -154,6 +154,28 @@ class NativeDownloads {
     }
   }
 
+  /// Buka pemilih berkas Android dan kembalikan `content://` URI apa adanya.
+  ///
+  /// Dipakai input file di WebView: URI diteruskan langsung ke WebView tanpa
+  /// menyalin berkas ke cache aplikasi (menyalin berkas 8 GB butuh menit).
+  /// null berarti kanal native tidak tersedia; daftar kosong berarti pengguna
+  /// membatalkan pemilihan.
+  static Future<List<String>?> pickDocuments({bool multiple = false}) async {
+    try {
+      final res = await _channel.invokeMethod<List<Object?>>('pickFiles', {
+        'multiple': multiple,
+      });
+      return (res ?? const <Object?>[])
+          .map((e) => e?.toString() ?? '')
+          .where((e) => e.isNotEmpty)
+          .toList(growable: false);
+    } on PlatformException {
+      return null;
+    } on MissingPluginException {
+      return null;
+    }
+  }
+
   static Future<void> scanFile(String path) async {
     try {
       await _channel.invokeMethod<bool>('scanFile', {'path': path});

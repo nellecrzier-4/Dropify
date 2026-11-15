@@ -49,6 +49,12 @@ abstract class AppStrings {
   String get gofileEmpty;
   String get gofileTokenNeeded;
   String get gofilePremiumNeeded;
+  String get gofileStartPin;
+  String get gofileStartUnpin;
+  String get gofileStartSaved;
+  String get gofileStartCleared;
+  String get gofileStartNeedsFolder;
+  String get gofileOpenStart;
   String get noAccount;
   String get preparingSession;
   String get fillCredentials;
@@ -1034,6 +1040,27 @@ class StringsId extends AppStrings {
       'Daftar file akun Gofile hanya tersedia untuk akun premium '
       '(API membalas error-notPremium).';
 
+  @override
+  String get gofileStartPin => 'Jadikan halaman awal';
+
+  @override
+  String get gofileStartUnpin => 'Hapus halaman awal';
+
+  @override
+  String get gofileStartSaved =>
+      'Folder ini jadi halaman awal Gofile. Buka Gofile lagi untuk langsung ke sini.';
+
+  @override
+  String get gofileStartCleared =>
+      'Halaman awal Gofile dihapus. Aplikasi kembali membuka beranda.';
+
+  @override
+  String get gofileStartNeedsFolder =>
+      'Buka folder dulu, baru bisa dijadikan halaman awal.';
+
+  @override
+  String get gofileOpenStart => 'Buka folder utama';
+
 }
 
 class StringsEn extends AppStrings {
@@ -1802,5 +1829,26 @@ class StringsEn extends AppStrings {
   String get gofilePremiumNeeded =>
       'Listing your Gofile account files requires a premium account '
       '(the API answers error-notPremium).';
+
+  @override
+  String get gofileStartPin => 'Set as start page';
+
+  @override
+  String get gofileStartUnpin => 'Remove start page';
+
+  @override
+  String get gofileStartSaved =>
+      'This folder is now the Gofile start page. Next time Gofile opens here.';
+
+  @override
+  String get gofileStartCleared =>
+      'Gofile start page removed. The app opens the home page again.';
+
+  @override
+  String get gofileStartNeedsFolder =>
+      'Open a folder first, then it can be the start page.';
+
+  @override
+  String get gofileOpenStart => 'Open main folder';
 
 }

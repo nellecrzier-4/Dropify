@@ -10,6 +10,8 @@ import 'package:webview_flutter_android/webview_flutter_android.dart';
 import '../l10n/locale_controller.dart';
 import '../models/pd_item.dart';
 import '../services/download_service.dart';
+import '../services/gofile_start.dart';
+import '../services/native_downloads.dart';
 import '../services/pixeldrain_api.dart';
 import '../services/web_download_links.dart';
 import '../theme/app_theme.dart';
@@ -64,9 +66,15 @@ class _GofileWebScreenState extends State<GofileWebScreen> {
     return shared ?? (_ownDownloads ??= DownloadService(PixeldrainApi()));
   }
 
-  String get _startUrl => widget.token != null && widget.token!.isNotEmpty
+  /// Halaman awal Gofile yang tersimpan ("folder utama") untuk akun ini.
+  String? _pinnedUrl;
+
+  /// URL halaman yang sedang tampil.
+  String? _currentUrl;
+
+  String get _loginUrl => widget.token != null && widget.token!.isNotEmpty
       ? 'https://gofile.io/login/${widget.token}'
-      : (widget.url ?? 'https://gofile.io/');
+      : 'https://gofile.io/';
 
   @override
   void initState() {
@@ -77,13 +85,35 @@ class _GofileWebScreenState extends State<GofileWebScreen> {
       ..addJavaScriptChannel(_jsChannel, onMessageReceived: _onJsMessage)
       ..setNavigationDelegate(
         NavigationDelegate(
-          onPageFinished: (_) => _onPageFinished(),
+          onUrlChange: (change) => _currentUrl = change.url,
+          onPageFinished: (url) => _onPageFinished(url),
           onNavigationRequest: _onNavigationRequest,
         ),
-      )
-      ..loadRequest(Uri.parse(_startUrl));
+      );
 
     _attachFileChooser();
+    unawaited(_openFirstPage());
+  }
+
+  /// Buka tautan yang diminta layar sebelumnya, lalu folder utama yang
+  /// tersimpan, baru beranda/login. Tautan yang diketik pengguna selalu
+  /// disimpan sebagai folder utama, jadi tidak perlu diulang lain kali.
+  Future<void> _openFirstPage() async {
+    _pinnedUrl = await GofileStart.load(widget.token);
+    final wanted = widget.url?.trim();
+    var target = _loginUrl;
+    if (wanted != null && wanted.isNotEmpty) {
+      target = wanted;
+      if (GofileStart.isFolderPage(wanted)) {
+        await GofileStart.save(widget.token, wanted);
+        _pinnedUrl = wanted;
+      }
+    } else if (_pinnedUrl != null) {
+      target = _pinnedUrl!;
+    }
+    if (!mounted) return;
+    await _web.loadRequest(Uri.parse(target));
+    if (mounted && _pinnedUrl != null) setState(() {});
   }
 
   /// Sambungkan pemilih berkas WebView ke pemilih berkas aplikasi, supaya
@@ -96,9 +126,18 @@ class _GofileWebScreenState extends State<GofileWebScreen> {
   }
 
   Future<List<String>> _onShowFileSelector(FileSelectorParams params) async {
+    final multiple = params.mode == FileSelectorMode.openMultiple;
+
+    // Jalur utama: pemilih native mengembalikan content:// URI apa adanya,
+    // jadi berkas besar tidak disalin dulu ke cache (file_picker menyalin
+    // seluruh isi berkas sebelum WebView bisa mengunggahnya).
+    final native = await NativeDownloads.pickDocuments(multiple: multiple);
+    if (native != null) return native;
+
+    // Cadangan kalau kanal native tidak tersedia.
     try {
       final result = await FilePicker.platform.pickFiles(
-        allowMultiple: params.mode == FileSelectorMode.openMultiple,
+        allowMultiple: multiple,
         type: FileType.any,
         withData: false,
       );
@@ -118,9 +157,40 @@ class _GofileWebScreenState extends State<GofileWebScreen> {
     super.dispose();
   }
 
-  Future<void> _onPageFinished() async {
+  Future<void> _onPageFinished(String url) async {
+    _currentUrl = url;
     await _applyTheme();
     await _installDownloadHooks();
+
+    // Folder pertama yang dibuka otomatis jadi halaman awal, supaya pengguna
+    // tidak perlu menempelkan tautannya lagi.
+    if (_pinnedUrl == null && GofileStart.isFolderPage(url)) {
+      await GofileStart.save(widget.token, url);
+      if (!mounted) return;
+      setState(() => _pinnedUrl = url);
+      showAppSnack(context, context.s.gofileStartSaved);
+    }
+  }
+
+  /// Tombol pin: jadikan halaman sekarang sebagai halaman awal, atau hapus.
+  Future<void> _togglePin() async {
+    final s = context.s;
+    if (_pinnedUrl != null) {
+      await GofileStart.clear(widget.token);
+      if (!mounted) return;
+      setState(() => _pinnedUrl = null);
+      showAppSnack(context, s.gofileStartCleared);
+      return;
+    }
+    final url = _currentUrl;
+    if (url == null || !GofileStart.isFolderPage(url)) {
+      showAppSnack(context, s.gofileStartNeedsFolder);
+      return;
+    }
+    await GofileStart.save(widget.token, url);
+    if (!mounted) return;
+    setState(() => _pinnedUrl = url);
+    showAppSnack(context, s.gofileStartSaved);
   }
 
   /// Selaraskan tampilan Gofile dengan tema aplikasi: warna permukaan, sudut
@@ -303,6 +373,17 @@ class _GofileWebScreenState extends State<GofileWebScreen> {
                     child: Text(
                       'Gofile',
                       style: Theme.of(context).textTheme.headlineSmall,
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: _pinnedUrl != null
+                        ? context.s.gofileStartUnpin
+                        : context.s.gofileStartPin,
+                    onPressed: _togglePin,
+                    icon: Icon(
+                      _pinnedUrl != null
+                          ? Icons.push_pin_rounded
+                          : Icons.push_pin_outlined,
                     ),
                   ),
                   IconButton(

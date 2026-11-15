@@ -35,9 +35,62 @@ class MainActivity : FlutterActivity() {
 
     private val channelName = "com.nel.dropify/native"
     private var pendingPermission: MethodChannel.Result? = null
+    private var pendingPicker: MethodChannel.Result? = null
 
     companion object {
         private const val REQUEST_PERMISSIONS = 4711
+        private const val REQUEST_PICK_FILES = 4712
+    }
+
+    /**
+     * Hasil pemilih berkas untuk input file di WebView.
+     *
+     * Yang dikembalikan adalah `content://` URI asli, bukan salinan di cache:
+     * WebView bisa membacanya langsung (izin baca disimpan di sini), jadi
+     * berkas besar tidak perlu disalin dulu sebelum diunggah.
+     */
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != REQUEST_PICK_FILES) return
+
+        val uris = mutableListOf<String>()
+        if (resultCode == RESULT_OK && data != null) {
+            val clip = data.clipData
+            if (clip != null) {
+                for (i in 0 until clip.itemCount) {
+                    uris.add(clip.getItemAt(i).uri.toString())
+                }
+            }
+            if (uris.isEmpty()) {
+                data.data?.let { uris.add(it.toString()) }
+            }
+        }
+        pendingPicker?.success(uris)
+        pendingPicker = null
+    }
+
+    private fun pickFiles(multiple: Boolean, result: MethodChannel.Result) {
+        if (pendingPicker != null) {
+            result.error("busy", "Pemilih berkas masih terbuka", null)
+            return
+        }
+        pendingPicker = result
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "*/*"
+            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, multiple)
+            addFlags(
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                    Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION,
+            )
+        }
+        try {
+            @Suppress("DEPRECATION")
+            startActivityForResult(intent, REQUEST_PICK_FILES)
+        } catch (e: ActivityNotFoundException) {
+            pendingPicker = null
+            result.success(emptyList<String>())
+        }
     }
 
     override fun onRequestPermissionsResult(
@@ -132,6 +185,10 @@ class MainActivity : FlutterActivity() {
                             }
                             result.success(true)
                         }
+                        "pickFiles" -> pickFiles(
+                            call.argument<Boolean>("multiple") ?: false,
+                            result,
+                        )
                         "notificationsEnabled" -> result.success(notificationsEnabled())
                         "systemAccent" -> result.success(systemAccentColor())
                         "requestPermissions" -> requestPermissions(result)
