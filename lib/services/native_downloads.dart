@@ -209,6 +209,17 @@ class NativeDownloads {
     }
   }
 
+  /// Versi aplikasi yang benar-benar terpasang, mis. "1.7.10 (26)".
+  static Future<String> appVersion() async {
+    try {
+      final res = await _channel.invokeMethod<Object?>('appVersion');
+      final text = res?.toString() ?? '';
+      return text.isEmpty ? '-' : text;
+    } catch (_) {
+      return '-';
+    }
+  }
+
   /// Ruang kosong di penyimpanan bersama (byte); -1 kalau tidak diketahui.
   static Future<int> freeSpace() async {
     try {

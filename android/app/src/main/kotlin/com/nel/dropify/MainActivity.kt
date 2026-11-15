@@ -319,6 +319,7 @@ class MainActivity : FlutterActivity() {
                             result.success(true)
                         }
                         "freeSpace" -> result.success(freeSpace())
+                        "appVersion" -> result.success(appVersion())
                         "resolveDocument" -> resolveDocument(
                             call.argument<String>("uri"),
                             result,
@@ -336,6 +337,20 @@ class MainActivity : FlutterActivity() {
                     result.error("native_error", e.message ?: e.toString(), null)
                 }
             }
+    }
+
+    /** Versi APK yang benar-benar terpasang, mis. "1.7.10 (26)". */
+    private fun appVersion(): String = try {
+        val info = packageManager.getPackageInfo(packageName, 0)
+        val code = if (android.os.Build.VERSION.SDK_INT >= 28) {
+            info.longVersionCode
+        } else {
+            @Suppress("DEPRECATION")
+            info.versionCode.toLong()
+        }
+        "${info.versionName} ($code)"
+    } catch (e: Exception) {
+        "-"
     }
 
     /** Ruang kosong penyimpanan bersama (byte); -1 kalau tidak terbaca. */

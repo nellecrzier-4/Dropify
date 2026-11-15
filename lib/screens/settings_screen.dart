@@ -23,11 +23,18 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _hasFileAccess = true;
+  String _version = '';
 
   @override
   void initState() {
     super.initState();
     _checkAccess();
+    _loadVersion();
+  }
+
+  Future<void> _loadVersion() async {
+    final version = await NativeDownloads.appVersion();
+    if (mounted) setState(() => _version = version);
   }
 
   Future<void> _checkAccess() async {
@@ -337,7 +344,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               _SettingRow(
                                 icon: Icons.info_outline_rounded,
                                 title: s.appName,
-                                subtitle: '${s.version} 1.0.0 (v10)',
+                                subtitle: '${s.version} '
+                                    '${_version.isEmpty ? '…' : _version}',
                               ),
                             ],
                           ),
