@@ -306,13 +306,39 @@ class _LoginBody extends StatelessWidget {
         ),
         if (controller.error != null) ...[
           const SizedBox(height: 14),
-          Text(
-            controller.error!,
-            style: TextStyle(color: scheme.error, fontSize: 13),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: scheme.errorContainer,
+              borderRadius: BorderRadius.circular(AppRadii.md),
+            ),
+            child: Text(
+              _errorText(context, controller.error!),
+              style: TextStyle(
+                color: scheme.onErrorContainer,
+                fontSize: 13,
+                height: 1.4,
+              ),
+            ),
           ),
         ],
       ],
     );
+  }
+}
+
+String _errorText(BuildContext context, String code) {
+  final s = context.s;
+  switch (code) {
+    case 'butuh_api_token':
+    case 'token_tidak_valid':
+      return s.gofileTokenNeeded;
+    case 'error-notPremium':
+      return s.gofilePremiumNeeded;
+    case 'error-accountId':
+      return s.gofileTokenNeeded;
+    default:
+      return s.downloadFailedSnack('Gofile', code);
   }
 }
 

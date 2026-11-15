@@ -47,6 +47,8 @@ abstract class AppStrings {
   String get gofilePasteHint;
   String get gofileGuestNote;
   String get gofileEmpty;
+  String get gofileTokenNeeded;
+  String get gofilePremiumNeeded;
   String get noAccount;
   String get preparingSession;
   String get fillCredentials;
@@ -1021,6 +1023,17 @@ class StringsId extends AppStrings {
   @override
   String get gofileEmpty => 'Belum ada file di akun Gofile ini.';
 
+
+  @override
+  String get gofileTokenNeeded =>
+      'Tautan login dari email tidak bisa dipakai langsung oleh aplikasi. '
+      'Buka gofile.io → Profile → API token, lalu tempel token itu di sini.';
+
+  @override
+  String get gofilePremiumNeeded =>
+      'Daftar file akun Gofile hanya tersedia untuk akun premium '
+      '(API membalas error-notPremium).';
+
 }
 
 class StringsEn extends AppStrings {
@@ -1778,5 +1791,16 @@ class StringsEn extends AppStrings {
 
   @override
   String get gofileEmpty => 'No files in this Gofile account yet.';
+
+
+  @override
+  String get gofileTokenNeeded =>
+      'The sign-in link from the email cannot be used by the app directly. '
+      'Open gofile.io → Profile → API token, then paste that token here.';
+
+  @override
+  String get gofilePremiumNeeded =>
+      'Listing your Gofile account files requires a premium account '
+      '(the API answers error-notPremium).';
 
 }

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 
 /// Klien API Gofile (https://gofile.io/api).
@@ -32,14 +34,53 @@ class GofileApi {
     }
   }
 
-  /// Ambil info akun dari token.
-  Future<GofileAccount> account(String token) async {
-    final res = await _dio.get<Map<String, dynamic>>(
-      '/accounts',
-      options: Options(headers: _auth(token)),
-    );
-    final data = _data(res);
-    return GofileAccount.fromJson(data, fallbackToken: token);
+  /// Ambil info akun dari token. Endpoint Gofile butuh account id di path,
+  /// jadi id diambil dari klaim di dalam token (JWT) kalau ada.
+  Future<GofileAccount> account(String token, {String? accountId}) async {
+    final id = accountId ?? accountIdFromToken(token);
+    if (id == null) throw GofileException('butuh_api_token');
+    try {
+      final res = await _dio.get<Map<String, dynamic>>(
+        '/accounts/$id',
+        options: Options(headers: _auth(token)),
+      );
+      final data = _data(res);
+      return GofileAccount.fromJson(data, fallbackToken: token);
+    } on DioException catch (e) {
+      throw GofileException(
+        _apiCode(e) ?? 'HTTP ${e.response?.statusCode ?? 0}',
+      );
+    }
+  }
+
+  /// Baca account id dari payload JWT (token API dari halaman profil Gofile).
+  static String? accountIdFromToken(String token) {
+    final parts = token.split('.');
+    if (parts.length != 3) return null;
+    try {
+      var payload = parts[1].replaceAll('-', '+').replaceAll('_', '/');
+      while (payload.length % 4 != 0) {
+        payload += '=';
+      }
+      final json = utf8.decode(base64.decode(payload));
+      final map = jsonDecode(json);
+      if (map is! Map) return null;
+      for (final key in const ['id', 'accountId', 'account', 'sub', 'aid']) {
+        final value = map[key];
+        if (value is String && value.length >= 8) return value;
+      }
+    } catch (_) {
+      return null;
+    }
+    return null;
+  }
+
+  String? _apiCode(DioException e) {
+    final data = e.response?.data;
+    if (data is Map && data['status'] is String) {
+      return data['status'] as String;
+    }
+    return null;
   }
 
   /// Daftar isi folder (root memakai `rootFolder` dari akun).
@@ -47,10 +88,17 @@ class GofileApi {
     String folderId,
     String token,
   ) async {
-    final res = await _dio.get<Map<String, dynamic>>(
-      '/contents/$folderId',
-      queryParameters: {'token': token, 'pageSize': 1000},
-    );
+    late final Response<Map<String, dynamic>> res;
+    try {
+      res = await _dio.get<Map<String, dynamic>>(
+        '/contents/$folderId',
+        queryParameters: {'token': token, 'pageSize': 1000},
+      );
+    } on DioException catch (e) {
+      throw GofileException(
+        _apiCode(e) ?? 'HTTP ${e.response?.statusCode ?? 0}',
+      );
+    }
     final data = _data(res);
     final children = data['children'];
     final entries = <GofileEntry>[];
