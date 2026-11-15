@@ -864,7 +864,19 @@ class DownloadService extends ChangeNotifier {
       }
     }
 
-    final directProbe = await _probeUrl(task.directUrl, task.directHeaders);
+    var directProbe = await _probeUrl(task.directUrl, task.directHeaders);
+    // Kalau ditolak karena kuota/IP, putar proxy lalu coba lagi.
+    var probeRotations = 0;
+    while (!directProbe.ok &&
+        probeRotations < 4 &&
+        (directProbe.error == 'rate_limited' || task.viaBypass)) {
+      if (!ProxyService.instance.rotate()) break;
+      probeRotations++;
+      _log('proxy', 'putar ke ${ProxyService.instance.current} '
+          '(probe ${directProbe.error})');
+      directProbe = await _probeUrl(task.directUrl, task.directHeaders);
+      if (_disposed || task.canceled) return;
+    }
     if (_disposed || task.canceled) return;
     if (directProbe.ok) {
       await _run(
@@ -1030,7 +1042,10 @@ class DownloadService extends ChangeNotifier {
         lastError = e;
         if (task.canceled) return;
         final text = e.toString();
-        if (text.contains('429') || text.contains('403')) {
+        if (text.contains('429') ||
+            text.contains('403') ||
+            text.contains('limit_page') ||
+            text.contains('captcha_required')) {
           if (ProxyService.instance.rotate()) {
             _log('proxy', 'putar ke ${ProxyService.instance.current} (unduhan)');
           }
@@ -1339,6 +1354,24 @@ class DownloadService extends ChangeNotifier {
       } catch (_) {}
       throw _RetryableError(_s.invalidRange);
     }
+    if (code == 200 || code == 206) {
+      final type = (response.headers.value(Headers.contentTypeHeader) ?? '')
+          .toLowerCase();
+      if (type.contains('text/html')) {
+        final hint = await _peekBody(response.data!);
+        final lower = hint.toLowerCase();
+        _log('limit', '${task.name}: halaman HTML (${hint.length} char)');
+        if (lower.contains('limit') ||
+            lower.contains('human') ||
+            lower.contains('captcha')) {
+          // Kuota harian per-IP: putar proxy lalu ulangi.
+          throw _RetryableError(
+            lower.contains('captcha') ? 'captcha_required' : 'limit_page',
+          );
+        }
+        throw _RetryableError('HTML $hint');
+      }
+    }
     if (code != 200 && code != 206) {
       final captcha = bodyHint != null &&
           bodyHint.toLowerCase().contains('captcha');
@@ -1606,10 +1639,15 @@ class DownloadService extends ChangeNotifier {
       final code = res.statusCode ?? 0;
       if (code != 200 && code != 206) {
         final body = (res.data ?? '').toLowerCase();
-        if (body.contains('captcha')) {
+        if (body.contains('captcha') ||
+            body.contains('prove that you') ||
+            body.contains('human')) {
           return ProbeResult.fail('captcha_required');
         }
-        if (body.contains('rate_limited') || body.contains('hotlink')) {
+        if (body.contains('rate_limited') ||
+            body.contains('hotlink') ||
+            body.contains('download limit') ||
+            body.contains('limit exceeded')) {
           return ProbeResult.fail('rate_limited');
         }
         return ProbeResult.fail('HTTP $code');
