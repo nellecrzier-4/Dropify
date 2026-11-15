@@ -8,9 +8,13 @@ import '../widgets/motion.dart';
 /// Gofile di dalam aplikasi: memakai sesi web resmi mereka, tapi tampilan
 /// diselaraskan dengan tema aplikasi (warna, radius, header sendiri).
 class GofileWebScreen extends StatefulWidget {
-  const GofileWebScreen({super.key, this.url});
+  const GofileWebScreen({super.key, this.url, this.token});
 
   final String? url;
+
+  /// Token akun Gofile dari app; dipakai untuk login di web supaya sesi yang
+  /// terbuka adalah akun pengguna, bukan akun guest.
+  final String? token;
 
   @override
   State<GofileWebScreen> createState() => _GofileWebScreenState();
@@ -25,7 +29,13 @@ class _GofileWebScreenState extends State<GofileWebScreen> {
         onPageFinished: (_) => _applyTheme(),
       ),
     )
-    ..loadRequest(Uri.parse(widget.url ?? 'https://gofile.io/'));
+    ..loadRequest(
+      Uri.parse(
+        widget.token != null && widget.token!.isNotEmpty
+            ? 'https://gofile.io/login/${widget.token}'
+            : (widget.url ?? 'https://gofile.io/'),
+      ),
+    );
 
   /// Selaraskan tampilan Gofile dengan tema aplikasi: warna permukaan, sudut
   /// membulat, font, dan sembunyikan elemen navigasi mereka yang redundan.

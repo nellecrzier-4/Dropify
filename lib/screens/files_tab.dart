@@ -125,7 +125,7 @@ class _GofileBrowserState extends State<_GofileBrowser> {
   void _openWeb(BuildContext context, [String? url]) {
     Navigator.of(context).push(
       SharedAxisPageRoute<void>(
-        builder: (_) => GofileWebScreen(url: url),
+        builder: (_) => GofileWebScreen(url: url, token: widget.ctrl.token),
       ),
     );
   }
