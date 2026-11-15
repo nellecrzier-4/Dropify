@@ -393,8 +393,16 @@ class DownloadService extends ChangeNotifier {
       // Semua unduhan diserahkan ke DownloadManager Android: berjalan di proses
       // sistem, lanjut walau aplikasi ditutup, dan bisa dipantau ulang setelah
       // aplikasi dibuka kembali.
-      final url = urlOverride ?? task.directUrl;
-      final merged = <String, String>{...task.directHeaders, ...headers};
+      // Mirror bypass harus dipakai juga saat unduhan diserahkan ke
+      // DownloadManager; sebelumnya jalur ini selalu memakai pixeldrain.com
+      // langsung sehingga sakelar bypass tidak berefek.
+      final bypassUrl = PixeldrainBypass.linkForFileId(fileId) ?? task.directUrl;
+      final url = urlOverride ?? bypassUrl;
+      final viaBypass = urlOverride == null && bypassUrl != task.directUrl;
+      final merged = <String, String>{
+        if (!viaBypass) ...task.directHeaders,
+        ...headers,
+      };
       if (headers.isNotEmpty) {
         // Header sesi (cookie) menang atas header API.
         merged.addAll(headers);
