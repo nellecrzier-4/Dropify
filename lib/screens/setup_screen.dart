@@ -71,20 +71,19 @@ class _SetupScreenState extends State<SetupScreen> {
     final allow = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Izinkan jalan di latar belakang'),
-        content: const Text(
-          'Android membekukan aplikasi yang tidak diizinkan. Dengan izin ini, '
-          'unduhan dan unggahan lanjut tanpa perlu membuka Dropify lagi.',
-          style: TextStyle(fontSize: 13, height: 1.45),
+        title: Text(LocaleController.instance.strings.allowBackgroundTitle),
+        content: Text(
+          LocaleController.instance.strings.allowBackgroundBody,
+          style: const TextStyle(fontSize: 13, height: 1.45),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Nanti'),
+            child: Text(LocaleController.instance.strings.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Izinkan'),
+            child: Text(LocaleController.instance.strings.allowBackground),
           ),
         ],
       ),

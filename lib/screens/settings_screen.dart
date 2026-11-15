@@ -49,7 +49,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setLocal) => AlertDialog(
-          title: const Text('Proxy unduhan'),
+          title: Text(context.s.proxyTitle),
           content: SizedBox(
             width: double.maxFinite,
             child: SingleChildScrollView(
@@ -498,10 +498,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               ),
                               _SettingRow(
                                 icon: Icons.battery_saver_rounded,
-                                title: 'Jalan di latar belakang',
+                                title: context.s.backgroundRun,
                                 subtitle: _batteryOk
-                                    ? 'Diizinkan · tidak dibekukan sistem'
-                                    : 'Dibatasi sistem · ketuk untuk mengizinkan',
+                                    ? context.s.backgroundAllowed
+                                    : context.s.backgroundRestricted,
                                 onTap: () async {
                                   await NativeDownloads.requestBatteryExemption();
                                   await Future<void>.delayed(
@@ -524,7 +524,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               ),
                               _SettingRow(
                                 icon: Icons.bug_report_outlined,
-                                title: 'Log aplikasi',
+                                title: context.s.appLog,
                                 subtitle: 'dropify.log + crash.log',
                                 onTap: _showLogs,
                                 trailing: const _Chevron(),

@@ -246,6 +246,9 @@ ThemeData buildTheme([AppAppearance? appearance]) {
 
   final base = ThemeData(
     useMaterial3: true,
+    // Font aplikasi: Linotte (assets/fonts). Semua teks memakai keluarga ini
+    // lewat textTheme di bawah; widget yang memaksa font lain tetap menang.
+    fontFamily: 'Linotte',
     brightness: dark ? Brightness.dark : Brightness.light,
     colorScheme: scheme,
     scaffoldBackgroundColor: AppColors.bg,

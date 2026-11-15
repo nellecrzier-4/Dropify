@@ -109,7 +109,7 @@ class ProxyService extends ChangeNotifier {
       final verified = <String>[];
       // Uji bertahap sampai 16 proxy hidup, supaya putarannya panjang dan
       // tidak cepat kembali ke IP yang sudah kena batas.
-      const batch = 12;
+      const batch = 24;
       for (var i = 0; i < candidates.length && verified.length < _maxPool; i += batch) {
         final slice = candidates.skip(i).take(batch).toList();
         final results = await Future.wait(slice.map(_isAlive));
@@ -151,14 +151,21 @@ class ProxyService extends ChangeNotifier {
   }
 
   /// Cek apakah proxy bisa meneruskan HTTPS.
+  ///
+  /// Memakai generate_204 (balasan kosong 204) dengan tenggat pendek: cukup
+  /// untuk membuktikan CONNECT + TLS berhasil, tanpa mengunduh apa pun.
   Future<bool> _isAlive(String proxy) async {
-    final client = HttpClient()..connectionTimeout = const Duration(seconds: 5);
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 3)
+      ..idleTimeout = const Duration(seconds: 3);
     client.findProxy = (_) => 'PROXY $proxy';
     try {
-      final req = await client.getUrl(Uri.parse('https://example.com/'));
-      final res = await req.close().timeout(const Duration(seconds: 8));
+      final req = await client.getUrl(
+        Uri.parse('https://www.gstatic.com/generate_204'),
+      );
+      final res = await req.close().timeout(const Duration(seconds: 5));
       await res.drain<void>();
-      return res.statusCode > 0;
+      return res.statusCode == 204 || res.statusCode == 200;
     } catch (_) {
       return false;
     } finally {

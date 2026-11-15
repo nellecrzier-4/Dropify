@@ -260,6 +260,15 @@ abstract class AppStrings {
   String get downloadRestartLoop;
   String get reconnecting;
   String get storageFull;
+  String get backgroundRun;
+  String get backgroundAllowed;
+  String get backgroundRestricted;
+  String get allowBackgroundTitle;
+  String get allowBackgroundBody;
+  String get allowBackground;
+  String get appLog;
+  String get proxyTitle;
+
   String get systemDownloaderRequired;
   String get fileNotFoundOnPixeldrain;
   String get downloadBlocked;
@@ -283,6 +292,33 @@ abstract class AppStrings {
 }
 
 class StringsId extends AppStrings {
+  @override
+  String get backgroundRun => 'Jalan di latar belakang';
+
+  @override
+  String get backgroundAllowed => 'Diizinkan · tidak dibekukan sistem';
+
+  @override
+  String get backgroundRestricted =>
+      'Dibatasi sistem · ketuk untuk mengizinkan';
+
+  @override
+  String get allowBackgroundTitle => 'Izinkan jalan di latar belakang';
+
+  @override
+  String get allowBackgroundBody =>
+      'Android membekukan aplikasi yang tidak diizinkan. Dengan izin ini, '
+      'unduhan dan unggahan lanjut tanpa perlu membuka Dropify lagi.';
+
+  @override
+  String get allowBackground => 'Izinkan';
+
+  @override
+  String get appLog => 'Log aplikasi';
+
+  @override
+  String get proxyTitle => 'Proxy unduhan';
+
   const StringsId();
 
   @override
@@ -1092,6 +1128,33 @@ class StringsId extends AppStrings {
 }
 
 class StringsEn extends AppStrings {
+  @override
+  String get backgroundRun => 'Run in background';
+
+  @override
+  String get backgroundAllowed => 'Allowed · not frozen by the system';
+
+  @override
+  String get backgroundRestricted =>
+      'Restricted by the system · tap to allow';
+
+  @override
+  String get allowBackgroundTitle => 'Allow running in the background';
+
+  @override
+  String get allowBackgroundBody =>
+      'Android freezes apps that are not exempt. With this permission, '
+      'downloads and uploads continue without reopening Dropify.';
+
+  @override
+  String get allowBackground => 'Allow';
+
+  @override
+  String get appLog => 'App log';
+
+  @override
+  String get proxyTitle => 'Download proxy';
+
   const StringsEn();
 
   @override
