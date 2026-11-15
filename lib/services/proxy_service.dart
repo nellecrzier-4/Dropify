@@ -179,7 +179,7 @@ class ProxyService extends ChangeNotifier {
   }
 
   Future<void> setEnabled(bool value) async {
-    _enabled = value && _proxies.isNotEmpty;
+    _enabled = value && (_proxies.isNotEmpty || (_auto && _autoPool.isNotEmpty));
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_keyEnabled, _enabled);

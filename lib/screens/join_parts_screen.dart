@@ -1,9 +1,9 @@
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
 import '../l10n/locale_controller.dart';
+import '../services/join_service.dart';
 import '../services/native_downloads.dart';
 import '../theme/app_theme.dart';
 import '../utils/file_types.dart';
@@ -105,73 +105,48 @@ class _JoinPartsScreenState extends State<JoinPartsScreen> {
     final dir = Directory(NativeDownloads.folderPath);
     final output = File('${dir.path}/${group.outputName}');
 
-    setState(() => _busy = true);
-    try {
-      if (await output.exists()) {
-        final overwrite = await showExpressiveDialog<bool>(
-          context: context,
-          builder: (d) => AlertDialog(
-            title: Text(s.joinOverwriteTitle),
-            content: Text(s.joinOverwriteBody(group.outputName)),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(d, false),
-                child: Text(s.cancel),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(d, true),
-                child: Text(s.merge),
-              ),
-            ],
-          ),
-        );
-        if (overwrite != true) {
-          setState(() => _busy = false);
-          return;
-        }
-        await output.delete();
-      }
-
-      final sink = output.openWrite();
-      final buffer = Uint8List(2 * 1024 * 1024);
-      try {
-        for (final file in group.files) {
-          final input = await file.open();
-          try {
-            while (true) {
-              final read = await input.readInto(buffer);
-              if (read <= 0) break;
-              sink.add(buffer.sublist(0, read));
-            }
-          } finally {
-            await input.close();
-          }
-        }
-        await sink.flush();
-      } finally {
-        await sink.close();
-      }
-
-      if (_deleteParts) {
-        for (final file in group.files) {
-          try {
-            await file.delete();
-          } catch (_) {}
-        }
-      }
-
-      NativeDownloads.scanFile(output.path);
-      if (!mounted) return;
-      showAppSnack(context, s.joinSucceeded(group.outputName));
-      await _scan();
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(s.joinFailedDetail('$e'))));
-    } finally {
-      if (mounted) setState(() => _busy = false);
+    if (await output.exists()) {
+      final overwrite = await showExpressiveDialog<bool>(
+        context: context,
+        builder: (d) => AlertDialog(
+          title: Text(s.joinOverwriteTitle),
+          content: Text(s.joinOverwriteBody(group.outputName)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(d, false),
+              child: Text(s.cancel),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(d, true),
+              child: Text(s.merge),
+            ),
+          ],
+        ),
+      );
+      if (overwrite != true) return;
     }
+
+    final result = await JoinService.instance.join(
+      parts: group.files,
+      outputPath: output.path,
+      outputName: group.outputName,
+      deleteParts: _deleteParts,
+    );
+    if (!mounted) return;
+    if (result == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            s.joinFailedDetail(JoinService.instance.error ?? 'gagal'),
+          ),
+        ),
+      );
+      return;
+    }
+    showAppSnack(context, s.joinSucceeded(group.outputName));
+    await _scan();
   }
+
   @override
   Widget build(BuildContext context) {
     final s = context.s;
@@ -261,6 +236,84 @@ class _JoinPartsScreenState extends State<JoinPartsScreen> {
                     ),
                   ),
                 ),
+              ),
+              ListenableBuilder(
+                listenable: JoinService.instance,
+                builder: (context, _) {
+                  final join = JoinService.instance;
+                  if (join.status == JoinStatus.idle) {
+                    return const SizedBox.shrink();
+                  }
+                  final scheme = AppColors.scheme;
+                  return Padding(
+                    padding: const EdgeInsets.fromLTRB(18, 0, 18, 10),
+                    child: Surface(
+                      radius: AppRadii.lg,
+                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  join.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: AppColors.text,
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                join.status == JoinStatus.done
+                                    ? 'selesai'
+                                    : join.status == JoinStatus.error
+                                        ? 'gagal'
+                                        : '${(join.progress * 100).round()}%',
+                                style: TextStyle(
+                                  color: scheme.primary,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(99),
+                            child: LinearProgressIndicator(
+                              value: join.status == JoinStatus.done
+                                  ? 1
+                                  : join.progress,
+                              minHeight: 6,
+                              backgroundColor: scheme.surfaceContainerHighest,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            join.status == JoinStatus.running
+                                ? '${formatSize(join.doneBytes)} / '
+                                    '${formatSize(join.totalBytes)}'
+                                    ' · sisa ${formatEta(join.eta)} · '
+                                    'tetap lanjut walau halaman ditutup'
+                                : join.status == JoinStatus.done
+                                    ? 'Tersimpan · ${formatSize(join.totalBytes)}'
+                                    : join.error ?? '',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: scheme.onSurfaceVariant,
+                              fontSize: 11.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               ),
               Expanded(
                 child: AnimatedSwitcher(
