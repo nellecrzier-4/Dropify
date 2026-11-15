@@ -1,7 +1,7 @@
 name: dropify
 description: A Pixeldrain Client.
 publish_to: 'none'
-version: 1.10.3+46
+version: 1.10.4+47
 
 environment:
   sdk: '>=3.0.0 <4.0.0'

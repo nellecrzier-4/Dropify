@@ -87,7 +87,26 @@ class DownloadTask {
 
   DateTime _lastTick = DateTime.now();
   DateTime _lastChannelTick = DateTime.fromMillisecondsSinceEpoch(0);
-  int _lastBytes = 0;
+  final List<_Sample> _samples = <_Sample>[];
+
+  /// Catat posisi byte pada suatu waktu. Kecepatan dihitung dari jendela
+  /// 5 detik terakhir, jadi angkanya tidak melompat-lompat.
+  void sampleSpeed(int bytes) {
+    final now = DateTime.now();
+    _samples.add(_Sample(now, bytes));
+    while (_samples.length > 2 &&
+        now.difference(_samples.first.at).inMilliseconds > 5000) {
+      _samples.removeAt(0);
+    }
+    if (_samples.length < 2) return;
+    final first = _samples.first;
+    final last = _samples.last;
+    final seconds = last.at.difference(first.at).inMilliseconds / 1000;
+    if (seconds < 0.5) return;
+    final delta = last.bytes - first.bytes;
+    final instant = delta <= 0 ? 0.0 : delta / seconds;
+    speed = speed <= 0 ? instant : speed * 0.4 + instant * 0.6;
+  }
 
   bool get isActive =>
       status == DownloadStatus.preparing ||
@@ -106,6 +125,12 @@ class DownloadTask {
     if (left <= 0) return Duration.zero;
     return Duration(seconds: (left / speed).round());
   }
+}
+
+class _Sample {
+  const _Sample(this.at, this.bytes);
+  final DateTime at;
+  final int bytes;
 }
 
 /// Hasil pengecekan sebuah link sebelum diunduh.
@@ -413,8 +438,6 @@ class DownloadService extends ChangeNotifier {
     _log('native', '${task.name}: DownloadManager #${handle.id}');
     _notify();
 
-    var lastReceived = 0;
-    var lastTime = DateTime.now();
     var missing = 0;
 
     while (!_disposed) {
@@ -439,14 +462,7 @@ class DownloadService extends ChangeNotifier {
 
       if (state.total > 0) task.size = state.total;
       task.received = state.received;
-      final now = DateTime.now();
-      final seconds = now.difference(lastTime).inSeconds;
-      if (seconds >= 1) {
-        final delta = state.received - lastReceived;
-        task.speed = delta <= 0 ? 0 : delta / seconds;
-        lastReceived = state.received;
-        lastTime = now;
-      }
+      task.sampleSpeed(state.received);
       _notify();
 
       if (state.isDone) {
@@ -946,7 +962,6 @@ class DownloadService extends ChangeNotifier {
       ..status = DownloadStatus.downloading
       ..startedAt = DateTime.now()
       .._lastTick = DateTime.now()
-      .._lastBytes = 0
       ..received = 0
       ..attempts = 0;
     _notify();
@@ -1446,13 +1461,10 @@ class DownloadService extends ChangeNotifier {
     final now = DateTime.now();
     final elapsed = now.difference(task._lastTick).inMilliseconds;
     if (elapsed >= 500) {
-      final delta = received - task._lastBytes;
-      final instant = delta <= 0 ? 0.0 : delta * 1000 / elapsed;
-      // Rata-rata bergerak supaya angka di UI tidak naik-turun.
-      task.speed = task.speed <= 0 ? instant : task.speed * 0.65 + instant * 0.35;
+      task.sampleSpeed(received);
       if (task.speed > task.peakSpeed) task.peakSpeed = task.speed;
       task._lastTick = now;
-      task._lastBytes = received;
+
       // Notifikasi maksimal sekali per detik supaya UI/engine tidak tersendat.
       if (now.difference(task._lastChannelTick).inMilliseconds >= 1000) {
         task._lastChannelTick = now;

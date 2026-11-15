@@ -484,7 +484,9 @@ class _DownloadsTab extends StatelessWidget {
       case DownloadStatus.downloading:
         if (t.waiting) return s.waitingNetwork;
         final total = t.size > 0 ? formatSize(t.size) : '—';
-        final speed = t.speed > 0 ? '${formatSize(t.speed.round())}/s' : '—';
+        final speed = t.speed > 0
+            ? '${formatSize(t.speed.round())}/s · sisa ${formatEta(t.eta)}'
+            : '—';
         final via = t.viaBypass ? s.viaBypass : s.viaPixeldrain;
         return s.downloadingDetail(formatSize(t.received), total, speed, via);
       case DownloadStatus.done:

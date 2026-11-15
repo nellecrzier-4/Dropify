@@ -91,6 +91,19 @@ FileCategory categorize(String name, String mime) {
   return FileCategory.other;
 }
 
+/// Perkiraan waktu selesai dalam bentuk singkat: `12 mnt`, `1 j 5 mnt`.
+String formatEta(Duration? eta) {
+  if (eta == null) return '-';
+  final seconds = eta.inSeconds;
+  if (seconds <= 0) return '< 1 mnt';
+  if (seconds < 60) return '$seconds dtk';
+  final minutes = (seconds / 60).round();
+  if (minutes < 60) return '$minutes mnt';
+  final hours = minutes ~/ 60;
+  final rest = minutes % 60;
+  return rest == 0 ? '$hours j' : '$hours j $rest mnt';
+}
+
 String formatSize(int bytes) {
   if (bytes < 1000) return '$bytes B';
   const units = ['KB', 'MB', 'GB', 'TB'];
