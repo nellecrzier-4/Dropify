@@ -144,9 +144,7 @@ class _JoinPartsScreenState extends State<JoinPartsScreen> {
 
       NativeDownloads.scanFile(output.path);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${s.joined} ${group.outputName}')),
-      );
+      showAppSnack(context, '${s.joined} ${group.outputName}');
       await _scan();
     } catch (e) {
       if (!mounted) return;

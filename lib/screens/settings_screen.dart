@@ -646,9 +646,7 @@ class HistoryScreen extends StatelessWidget {
   Future<void> _open(BuildContext context, DownloadRecord record) async {
     final ok = await NativeDownloads.openPath(record.path);
     if (!ok && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${context.s.openFileFailed} ${record.path}')),
-      );
+      showAppSnack(context, '${context.s.openFileFailed} ${record.path}');
     }
   }
 

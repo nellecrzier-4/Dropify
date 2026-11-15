@@ -85,13 +85,12 @@ Future<void> downloadItem(
     text = s.downloadStartedSnack(task.name);
   }
 
-  messenger.showSnackBar(
-    SnackBar(
-      content: Text(text, maxLines: 2, overflow: TextOverflow.ellipsis),
-      action: SnackBarAction(
-        label: s.downloads,
-        onPressed: () => showTransfers(context, ctrl),
-      ),
+  showAppSnack(
+    context,
+    text,
+    action: SnackBarAction(
+      label: s.downloads,
+      onPressed: () => showTransfers(context, ctrl),
     ),
   );
 }
@@ -107,9 +106,7 @@ void showItemActions(BuildContext context, DriveController ctrl, PdItem item) {
 
   void copy(BuildContext context, String text, String message) {
     Clipboard.setData(ClipboardData(text: text));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    showAppSnack(context, message);
   }
 
   showExpressiveSheet<void>(

@@ -1007,3 +1007,29 @@ class StatRow extends StatelessWidget {
     );
   }
 }
+
+/// Snackbar standar aplikasi: mengapung di atas nav, bisa di-swipe kiri/kanan
+/// atau ditutup lewat tombol X (penting untuk pesan error yang panjang).
+void showAppSnack(
+  BuildContext context,
+  String message, {
+  SnackBarAction? action,
+  Duration duration = const Duration(seconds: 8),
+}) {
+  final messenger = ScaffoldMessenger.of(context);
+  messenger.hideCurrentSnackBar();
+  messenger.showSnackBar(
+    SnackBar(
+      content: Text(
+        message,
+        maxLines: 4,
+        overflow: TextOverflow.ellipsis,
+      ),
+      action: action,
+      showCloseIcon: true,
+      dismissDirection: DismissDirection.horizontal,
+      duration: duration,
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 96),
+    ),
+  );
+}

@@ -147,7 +147,7 @@ class _FolderViewState extends State<FolderView> {
   }
 
   void _snack(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    showAppSnack(context, message);
   }
 
   Future<String?> _askName({required String title, String initial = ''}) {

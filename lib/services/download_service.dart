@@ -128,6 +128,23 @@ class _RetryableError implements Exception {
 class _RangeUnsupported implements Exception {}
 
 /// Satu potongan kecil file; diambil bergiliran oleh worker.
+/// Mutex async sederhana untuk menyerialkan penulisan ke satu file handle.
+class _AsyncLock {
+  Future<void> _tail = Future<void>.value();
+
+  Future<T> run<T>(Future<T> Function() action) {
+    final completer = Completer<T>();
+    _tail = _tail.then((_) async {
+      try {
+        completer.complete(await action());
+      } catch (error, stack) {
+        completer.completeError(error, stack);
+      }
+    });
+    return completer.future;
+  }
+}
+
 class _Chunk {
   _Chunk(this.start, this.end);
 
@@ -544,10 +561,10 @@ class DownloadService extends ChangeNotifier {
 
   /// Unduhan paralel dengan antrean potongan.
   ///
-  /// File dipecah jadi potongan kecil (4–16 MB). Sejumlah worker mengambil
-  /// potongan berikutnya dari antrean, jadi semua koneksi tetap sibuk sampai
-  /// akhir (tidak ada satu potongan besar yang tertinggal dan membuat
-  /// kecepatan menurun di akhir). Tiap percobaan ulang memakai node CDN lain.
+  /// File ditulis lewat SATU handle [RandomAccessFile] dengan offset eksplisit.
+  /// (Sebelumnya tiap potongan membuka file dalam mode append; pada file besar
+  /// flag O_APPEND membuat offset diabaikan OS sehingga file membengkak dan
+  /// unduhan gagal.)
   Future<void> _runParallel(
     DownloadTask task,
     File part,
@@ -559,76 +576,91 @@ class DownloadService extends ChangeNotifier {
       ..size = size
       ..received = 0;
 
-    // Siapkan file kosong sebesar ukuran akhir (sparse file).
     final raf = await part.open(mode: FileMode.write);
-    try {
-      await raf.setPosition(size - 1);
-      await raf.writeByte(0);
-    } finally {
-      await raf.close();
-    }
-
+    final lock = _AsyncLock();
     final token = CancelToken();
     task.cancelToken = token;
 
-    final workers = _workerCount(size);
-    var next = 0;
-    var running = 0;
-    var extra = 0;
-    final finished = Completer<void>();
+    try {
+      // Siapkan file seukuran target (sparse).
+      await raf.setPosition(size - 1);
+      await raf.writeByte(0);
 
-    void checkDone() {
-      if (next >= chunks.length && running == 0 && !finished.isCompleted) {
-        finished.complete();
-      }
-    }
+      final workers = _workerCount(size);
+      var next = 0;
+      var running = 0;
+      var extra = 0;
+      final finished = Completer<void>();
 
-    Future<void> worker(int id) async {
-      running++;
-      try {
-        while (!task.canceled && !_disposed) {
-          if (next >= chunks.length) break;
-          final chunk = chunks[next++];
-          await _downloadChunk(task, part, chunk, nodes, id, token);
+      void checkDone() {
+        if (next >= chunks.length && running == 0 && !finished.isCompleted) {
+          finished.complete();
         }
-      } finally {
-        running--;
-        checkDone();
       }
-    }
 
-    for (var i = 0; i < workers; i++) {
-      unawaited(worker(i));
-    }
-
-    // Kalau kecepatan drop jauh dari puncak, tambah koneksi.
-    final booster = Timer.periodic(const Duration(seconds: 3), (timer) {
-      if (finished.isCompleted) {
-        timer.cancel();
-        return;
+      Object? workerError;
+      Future<void> worker(int id) async {
+        running++;
+        try {
+          while (!task.canceled && !_disposed) {
+            if (next >= chunks.length) break;
+            final chunk = chunks[next++];
+            await _downloadChunk(task, raf, lock, chunk, nodes, id, token);
+          }
+        } catch (e) {
+          workerError ??= e;
+        } finally {
+          running--;
+          checkDone();
+        }
       }
-      if (task.canceled || _disposed || next >= chunks.length) return;
-      final slow = task.peakSpeed > 0 && task.speed < task.peakSpeed * 0.65;
-      if (slow && extra < 4) {
-        extra++;
-        unawaited(worker(100 + extra));
+
+      for (var i = 0; i < workers; i++) {
+        unawaited(worker(i));
       }
-    });
 
-    await finished.future;
-    booster.cancel();
+      // Kalau kecepatan drop jauh dari puncak, tambah koneksi.
+      final booster = Timer.periodic(const Duration(seconds: 3), (timer) {
+        if (finished.isCompleted) {
+          timer.cancel();
+          return;
+        }
+        if (task.canceled || _disposed || next >= chunks.length) return;
+        final slow = task.peakSpeed > 0 && task.speed < task.peakSpeed * 0.65;
+        if (slow && extra < 4) {
+          extra++;
+          unawaited(worker(100 + extra));
+        }
+      });
 
-    if (task.canceled) return;
-    final received = chunks.fold<int>(0, (a, c) => a + c.received);
-    if (received < size) {
-      throw _RetryableError('koneksi berhenti sebelum selesai');
+      await finished.future;
+      booster.cancel();
+
+      if (task.canceled) return;
+      if (workerError != null) throw workerError!;
+
+      final receivedSum = chunks.fold<int>(0, (a, c) => a + c.received);
+      if (receivedSum < size) {
+        throw _RetryableError('koneksi berhenti sebelum selesai');
+      }
+
+      await raf.flush();
+      final length = await raf.length();
+      if (length != size) {
+        throw _RetryableError('ukuran file tidak sesuai ($length/$size byte)');
+      }
+      task.received = size;
+    } finally {
+      try {
+        await raf.close();
+      } catch (_) {}
     }
-    task.received = size;
   }
 
   Future<void> _downloadChunk(
     DownloadTask task,
-    File part,
+    RandomAccessFile raf,
+    _AsyncLock lock,
     _Chunk chunk,
     List<String> nodes,
     int workerId,
@@ -636,7 +668,7 @@ class DownloadService extends ChangeNotifier {
   ) async {
     var failures = 0;
 
-    while (!chunk.done) {
+    while (chunk.offset <= chunk.end) {
       if (task.canceled || _disposed) return;
       final from = chunk.offset;
       final url = nodes[(workerId + failures) % nodes.length];
@@ -661,9 +693,8 @@ class DownloadService extends ChangeNotifier {
         if (code == 200) throw _RangeUnsupported();
         if (code != 206) throw _RetryableError('HTTP $code');
 
-        final raf = await part.open(mode: FileMode.append);
-        await raf.setPosition(from);
         final buffer = BytesBuilder(copy: false);
+        var writePos = from;
         try {
           await for (final data
               in response.data!.stream.timeout(const Duration(seconds: 20))) {
@@ -671,19 +702,31 @@ class DownloadService extends ChangeNotifier {
             buffer.add(data);
             chunk.received += data.length;
             task.received += data.length;
-                  if (buffer.length >= 1024 * 1024) {
-              await raf.writeFrom(buffer.takeBytes());
+            if (buffer.length >= 1024 * 1024) {
+              final bytes = buffer.takeBytes();
+              final at = writePos;
+              await lock.run(() async {
+                await raf.setPosition(at);
+                await raf.writeFrom(bytes);
+              });
+              writePos += bytes.length;
             }
             _reportProgress(task, task.received);
           }
           if (buffer.length > 0) {
-            await raf.writeFrom(buffer.takeBytes());
+            final bytes = buffer.takeBytes();
+            final at = writePos;
+            await lock.run(() async {
+              await raf.setPosition(at);
+              await raf.writeFrom(bytes);
+            });
+            writePos += bytes.length;
           }
         } finally {
-          await raf.close();
+          buffer.clear();
         }
 
-        if (!chunk.done) {
+        if (chunk.offset <= chunk.end) {
           throw _RetryableError('potongan belum selesai');
         }
       } catch (e) {
