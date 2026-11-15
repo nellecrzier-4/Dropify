@@ -34,6 +34,7 @@ class GofileUploadTask {
   String? downloadPage;
 
   DateTime _lastTick = DateTime.now();
+  DateTime _lastNotify = DateTime.fromMillisecondsSinceEpoch(0);
   int _lastBytes = 0;
 
   bool get isActive =>
@@ -217,12 +218,18 @@ class GofileUploadService extends ChangeNotifier {
   void _reportProgress(GofileUploadTask task) {
     final now = DateTime.now();
     final elapsed = now.difference(task._lastTick).inMilliseconds;
-    if (elapsed >= 500) {
-      final delta = task.sent - task._lastBytes;
-      final instant = delta <= 0 ? 0.0 : delta * 1000 / elapsed;
-      task.speed = task.speed <= 0 ? instant : task.speed * 0.6 + instant * 0.4;
-      task._lastTick = now;
-      task._lastBytes = task.sent;
+    // onSendProgress dipanggil sangat sering; UI cukup ~3 kali per detik dan
+    // notifikasi maksimal sekali per detik.
+    if (elapsed < 300) return;
+
+    final delta = task.sent - task._lastBytes;
+    final instant = delta <= 0 ? 0.0 : delta * 1000 / elapsed;
+    task.speed = task.speed <= 0 ? instant : task.speed * 0.6 + instant * 0.4;
+    task._lastTick = now;
+    task._lastBytes = task.sent;
+
+    if (now.difference(task._lastNotify).inMilliseconds >= 1000) {
+      task._lastNotify = now;
       NativeDownloads.notifyDownload(
         id: task.notifyId,
         title: task.name,

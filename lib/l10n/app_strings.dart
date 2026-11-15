@@ -257,6 +257,8 @@ abstract class AppStrings {
   String connectionFailed(String detail);
   String loginFailedHttp(int code);
   String get downloadFailed;
+  String get downloadRestartLoop;
+  String get reconnecting;
   String get fileNotFoundOnPixeldrain;
   String get downloadBlocked;
   String get downloadDenied;
@@ -942,6 +944,13 @@ class StringsId extends AppStrings {
 
   @override
   String loginFailedHttp(int code) => 'Login gagal (HTTP $code). Coba lagi.';
+
+  @override
+  String get downloadRestartLoop =>
+      'Server terus mengabaikan lanjutan unduhan. Coba lagi atau pakai berkas lain.';
+
+  @override
+  String get reconnecting => 'Menyambung ulang…';
 
   @override
   String get downloadFailed => 'Download gagal.';
@@ -1737,6 +1746,13 @@ class StringsEn extends AppStrings {
 
   @override
   String loginFailedHttp(int code) => 'Sign-in failed (HTTP $code). Try again.';
+
+  @override
+  String get downloadRestartLoop =>
+      'The server keeps ignoring resume requests. Try again or use another file.';
+
+  @override
+  String get reconnecting => 'Reconnecting…';
 
   @override
   String get downloadFailed => 'Download failed.';

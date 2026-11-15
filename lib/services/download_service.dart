@@ -10,6 +10,7 @@ import '../l10n/locale_controller.dart';
 import '../models/pd_item.dart';
 import '../utils/file_types.dart';
 import 'app_settings.dart';
+import 'diagnostics.dart';
 import 'transfer_session.dart';
 import 'native_downloads.dart';
 import 'pixeldrain_api.dart';
@@ -66,6 +67,9 @@ class DownloadTask {
   CancelToken? cancelToken;
   bool canceled = false;
   bool waiting = false;
+
+  /// Berapa kali server memaksa unduhan diulang dari byte 0.
+  int fullRestarts = 0;
 
 
 
@@ -207,6 +211,8 @@ class DownloadService extends ChangeNotifier {
   final ProbeFn? _probeOverride;
   final String? _folderOverride;
   final Dio _dio;
+
+  // Folder log mengikuti folder unduhan (test memakai folder sementara).
 
   /// Instance yang dipakai layar utama (pill HomeTab + sheet Transfers).
   /// Diisi oleh [DriveController] supaya unduhan yang dimulai dari layar lain
@@ -351,6 +357,7 @@ class DownloadService extends ChangeNotifier {
       ..waiting = false
       ..cancelToken = null
       ..path = null
+      ..fullRestarts = 0
       ..startedAt = null
       ..endedAt = null;
   }
@@ -360,8 +367,11 @@ class DownloadService extends ChangeNotifier {
 
     final override = task.urlOverride;
     if (override != null) {
+      _log('probe', '${task.name} <- ${_short(override)}');
       final probe = await _probeUrl(override, task.extraHeaders);
       if (_disposed || task.canceled) return;
+      _log('probe', '${task.name}: ok=${probe.ok} size=${probe.size} '
+          'ranges=${probe.ranges} error=${probe.error}');
       if (probe.ok) {
         await _run(
           task,
@@ -528,6 +538,7 @@ class DownloadService extends ChangeNotifier {
         ),
       );
 
+      _log('done', '${task.name}: ${task.size} byte -> ${target.path}');
       task
         ..status = DownloadStatus.done
         ..size = await target.length()
@@ -555,6 +566,7 @@ class DownloadService extends ChangeNotifier {
   }
 
   void _fail(DownloadTask task, String message) {
+    _log('fail', '${task.name}: $message');
     task
       ..status = DownloadStatus.error
       ..error = message
@@ -626,9 +638,11 @@ class DownloadService extends ChangeNotifier {
     task.cancelToken = token;
 
     try {
-      // Siapkan file seukuran target (sparse).
-      await raf.setPosition(size - 1);
-      await raf.writeByte(0);
+      // CATATAN: jangan pra-alokasi berkas (setPosition(size-1) + writeByte).
+      // Di /storage/emulated/0 (FUSE) itu memicu penulisan nol sebesar seluruh
+      // berkas — untuk 11 GB perangkat sibuk bermenit-menit, progres terlihat
+      // macet, lalu aplikasi dihentikan sistem. Setiap potongan menulis pada
+      // offset eksplisit, jadi berkas memanjang sendiri sampai ukuran penuh.
 
       final workers = _workerCount(size);
       var next = 0;
@@ -857,6 +871,7 @@ class DownloadService extends ChangeNotifier {
     );
 
     final code = response.statusCode ?? 0;
+    _log('http', '${task.name}: $code start=$start');
     if (code == 416) {
       try {
         await part.delete();
@@ -868,7 +883,19 @@ class DownloadService extends ChangeNotifier {
     }
 
     final resuming = code == 206 && start > 0;
-    if (!resuming) start = 0;
+    if (!resuming) {
+      if (start > 0) {
+        // Server mengabaikan Range (balas 200): berkas harus diulang dari nol.
+        // Dibatasi supaya tidak berputar-putar mengunduh ulang terus-menerus.
+        task.fullRestarts++;
+        _log('restart', '${task.name}: server mengabaikan Range, mulai dari 0 '
+            '(percobaan ${task.fullRestarts})');
+        if (task.fullRestarts > 3) {
+          throw _RetryableError(_s.downloadRestartLoop);
+        }
+      }
+      start = 0;
+    }
 
     final lengthHeader =
         int.tryParse(response.headers.value(Headers.contentLengthHeader) ?? '');
@@ -928,6 +955,13 @@ class DownloadService extends ChangeNotifier {
     }
   }
 
+  String _short(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return url;
+    final tail = uri.pathSegments.isEmpty ? '' : uri.pathSegments.last;
+    return '${uri.host}/…/$tail';
+  }
+
   Future<File> _uniqueFile(Directory dir, String name) async {
     final wanted = _sanitize(name);
     final dot = wanted.lastIndexOf('.');
@@ -961,6 +995,11 @@ class DownloadService extends ChangeNotifier {
 
   /// Teks error sesuai bahasa aktif.
   AppStrings get _s => LocaleController.instance.strings;
+
+  void _log(String tag, String message) {
+    Diagnostics.instance.configure(folderPath);
+    Diagnostics.instance.log('download/$tag', message);
+  }
 
   String _friendlyError(Object? error) {
     if (error == null) return _s.downloadFailed;

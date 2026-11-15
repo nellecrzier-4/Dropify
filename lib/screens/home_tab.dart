@@ -561,7 +561,11 @@ class _ActiveDownloadsCard extends StatelessWidget {
                 duration: Motion.slow,
                 curve: Motion.emphasized,
                 builder: (context, value, _) => Text(
-                  '${(value * 100).round()}%',
+                  // Di bawah 10% satu desimal supaya angkanya terlihat bergerak
+                  // pada berkas besar (1% dari 11 GB = 112 MB).
+                  value * 100 < 10
+                      ? '${(value * 100).toStringAsFixed(1)}%'
+                      : '${(value * 100).round()}%',
                   style: TextStyle(
                     color: scheme.primary,
                     fontSize: 12.5,
@@ -575,7 +579,11 @@ class _ActiveDownloadsCard extends StatelessWidget {
           WaveProgressBar(value: progress, height: 9),
           const SizedBox(height: 9),
           Text(
-            context.s.savedToFolder,
+            active.any((t) => t.waiting)
+                ? context.s.reconnecting
+                : '${formatSize(active.fold<int>(0, (a, t) => a + t.received))}'
+                    ' / ${formatSize(active.fold<int>(0, (a, t) => a + t.size))}'
+                    ' · ${formatSize(active.first.speed.round())}/s',
             style: TextStyle(
               color: scheme.onSurfaceVariant,
               fontSize: 11.5,

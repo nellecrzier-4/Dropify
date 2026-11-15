@@ -8,11 +8,14 @@ import 'l10n/locale_controller.dart';
 import 'screens/start_screen.dart';
 import 'services/app_settings.dart';
 import 'services/cache_cleaner.dart';
+import 'services/diagnostics.dart';
 import 'theme/app_theme.dart';
 import 'theme/theme_controller.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Catat error & kejadian penting ke Download/Dropify/dropify.log.
+  Diagnostics.instance.install();
   // Edge-to-edge: konten menggambar di belakang status bar & navigation bar.
   await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   await LocaleController.instance.load();
