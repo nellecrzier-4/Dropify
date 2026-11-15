@@ -144,7 +144,11 @@ class _LoginScreenState extends State<LoginScreen> {
                         duration: const Duration(milliseconds: 420),
                         child: _checking
                             ? const _Checking(key: ValueKey('checking'))
-                            : _form(context),
+                            : Entrance(
+                                key: const ValueKey('form'),
+                                delay: const Duration(milliseconds: 90),
+                                child: _form(context),
+                              ),
                       ),
                     ),
                   ),

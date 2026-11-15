@@ -233,10 +233,13 @@ class Surface extends StatelessWidget {
       content = Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: onTap,
+          onTap: () {
+            HapticFeedback.selectionClick();
+            onTap!();
+          },
           borderRadius: BorderRadius.circular(radius),
-          splashColor: AppColors.scheme.primary.withValues(alpha: 0.08),
-          highlightColor: AppColors.scheme.primary.withValues(alpha: 0.05),
+          splashColor: AppColors.scheme.primary.withValues(alpha: 0.10),
+          highlightColor: AppColors.scheme.primary.withValues(alpha: 0.06),
           child: content,
         ),
       );
