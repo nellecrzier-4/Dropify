@@ -341,6 +341,11 @@ class MainActivity : FlutterActivity() {
                             result.success(true)
                         }
                         "freeSpace" -> result.success(freeSpace())
+                        "batteryOptimized" -> result.success(isBatteryOptimized())
+                        "requestBatteryExemption" -> {
+                            requestBatteryExemption()
+                            result.success(true)
+                        }
                         "readLogs" -> result.success(readLogs())
                         "downloadStart" -> {
                             val id = call.argument<String>("id") ?: ""
@@ -404,6 +409,31 @@ class MainActivity : FlutterActivity() {
         }
         return "== dropify.log ==\n${tail(File(dir, "dropify.log"), 120)}\n\n" +
             "== crash.log ==\n${tail(File(dir, "crash.log"), 80)}"
+    }
+
+    /** true kalau aplikasi masih dibatasi sistem (bisa dibekukan di latar). */
+    private fun isBatteryOptimized(): Boolean = try {
+        val power = getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+        val ignoring = power.isIgnoringBatteryOptimizations(packageName)
+        if (ignoring) false else true
+    } catch (e: Exception) {
+        false
+    }
+
+    private fun requestBatteryExemption() {
+        try {
+            val intent = Intent(
+                Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                Uri.parse("package:$packageName"),
+            )
+            startActivity(intent)
+        } catch (e: Exception) {
+            // Sebagian ROM tidak menyediakan dialog ini; buka daftar aplikasi.
+            try {
+                startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+            } catch (_: Exception) {
+            }
+        }
     }
 
     /** Versi APK yang benar-benar terpasang, mis. "1.7.10 (26)". */

@@ -26,6 +26,7 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _hasFileAccess = true;
+  bool _batteryOk = false;
   String _version = '';
 
   @override
@@ -33,6 +34,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.initState();
     _checkAccess();
     _loadVersion();
+    NativeDownloads.isBatteryOptimized().then((optimized) {
+      if (mounted) setState(() => _batteryOk = !optimized);
+    });
   }
 
   Future<void> _showProxy() async {
@@ -492,6 +496,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 subtitle: '${s.version} '
                                     '${_version.isEmpty ? '…' : _version}',
                               ),
+                              _SettingRow(
+                                icon: Icons.battery_saver_rounded,
+                                title: 'Jalan di latar belakang',
+                                subtitle: _batteryOk
+                                    ? 'Diizinkan · tidak dibekukan sistem'
+                                    : 'Dibatasi sistem · ketuk untuk mengizinkan',
+                                onTap: () async {
+                                  await NativeDownloads.requestBatteryExemption();
+                                  await Future<void>.delayed(
+                                      const Duration(seconds: 1));
+                                  final ok = !await NativeDownloads
+                                      .isBatteryOptimized();
+                                  if (mounted) setState(() => _batteryOk = ok);
+                                },
+                                trailing: const _Chevron(),
+                              ),
+                              const _RowDivider(),
                               _SettingRow(
                                 icon: Icons.vpn_lock_rounded,
                                 title: 'Proxy',

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../l10n/app_strings.dart';
 import '../l10n/locale_controller.dart';
+import '../services/native_downloads.dart';
 import '../theme/app_theme.dart';
 import '../widgets/anim.dart';
 import '../widgets/kit.dart';
@@ -62,9 +63,39 @@ class _SetupScreenState extends State<SetupScreen> {
     super.dispose();
   }
 
-  void _next(int count) {
+  /// Minta pengecualian penghemat baterai supaya unduhan/unggahan tidak
+  /// dibekukan sistem beberapa menit setelah aplikasi ditinggalkan.
+  Future<void> _askBackgroundPermission() async {
+    if (!await NativeDownloads.isBatteryOptimized()) return;
+    if (!mounted) return;
+    final allow = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Izinkan jalan di latar belakang'),
+        content: const Text(
+          'Android membekukan aplikasi yang tidak diizinkan. Dengan izin ini, '
+          'unduhan dan unggahan lanjut tanpa perlu membuka Dropify lagi.',
+          style: TextStyle(fontSize: 13, height: 1.45),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Nanti'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Izinkan'),
+          ),
+        ],
+      ),
+    );
+    if (allow == true) await NativeDownloads.requestBatteryExemption();
+  }
+
+  Future<void> _next(int count) async {
     if (_index == count - 1) {
-      widget.onDone();
+      await _askBackgroundPermission();
+      if (mounted) widget.onDone();
       return;
     }
     _controller.nextPage(

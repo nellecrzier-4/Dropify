@@ -283,6 +283,22 @@ class NativeDownloads {
     }
   }
 
+  /// true kalau sistem masih membatasi aplikasi di latar belakang.
+  static Future<bool> isBatteryOptimized() async {
+    try {
+      return await _channel.invokeMethod<bool>('batteryOptimized') ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Minta pengecualian penghemat baterai (agar tidak dibekukan di latar).
+  static Future<void> requestBatteryExemption() async {
+    try {
+      await _channel.invokeMethod<bool>('requestBatteryExemption');
+    } catch (_) {}
+  }
+
   /// Ruang kosong di penyimpanan bersama (byte); -1 kalau tidak diketahui.
   static Future<int> freeSpace() async {
     try {
