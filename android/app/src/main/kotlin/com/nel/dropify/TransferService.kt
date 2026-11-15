@@ -128,6 +128,20 @@ class TransferService : Service() {
         wifiLock = null
     }
 
+    /**
+     * Android 15+ memanggil ini kalau service tipe dataSync melewati batas
+     * waktunya. Kalau aplikasi tidak berhenti sendiri dalam beberapa detik,
+     * sistem melempar ForegroundServiceDidNotStopInTimeException dan mematikan
+     * proses — inilah crash yang terjadi saat aplikasi ditinggalkan.
+     */
+    override fun onTimeout(startId: Int) {
+        try {
+            super.onTimeout(startId)
+        } catch (_: Throwable) {
+        }
+        stopSelf()
+    }
+
     override fun onDestroy() {
         releaseLocks()
         super.onDestroy()

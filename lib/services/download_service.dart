@@ -1522,10 +1522,15 @@ class DownloadService extends ChangeNotifier {
   }
 
   /// Foreground service: hidup selama ada transfer, mati saat semua selesai.
+  ///
+  /// Unduhan yang dipegang DownloadManager berjalan di proses sistem, jadi
+  /// tidak butuh foreground service kita — dan service dataSync yang terlalu
+  /// lama hidup justru dimatikan sistem (ForegroundServiceDidNotStopInTime).
   void _syncService() {
     final active = tasks.where((t) => t.isActive).toList();
-    TransferSession.setDownloadsActive(active.isNotEmpty);
-    if (active.isEmpty) return;
+    final allSystem = active.isNotEmpty && active.every((t) => t.viaSystem);
+    TransferSession.setDownloadsActive(active.isNotEmpty && !allSystem);
+    if (active.isEmpty || allSystem) return;
 
     final now = DateTime.now();
     if (now.difference(_lastServiceUpdate).inMilliseconds < 1500) return;
