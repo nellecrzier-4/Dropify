@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 
 import '../l10n/locale_controller.dart';
 import '../utils/file_types.dart';
+import 'diagnostics.dart';
 import 'native_downloads.dart';
 
 enum GofileUploadStatus { queued, uploading, done, error }
@@ -35,6 +36,7 @@ class GofileUploadTask {
 
   DateTime _lastTick = DateTime.now();
   DateTime _lastNotify = DateTime.fromMillisecondsSinceEpoch(0);
+  DateTime _lastLog = DateTime.fromMillisecondsSinceEpoch(0);
   int _lastBytes = 0;
 
   bool get isActive =>
@@ -125,11 +127,13 @@ class GofileUploadService extends ChangeNotifier {
     );
     tasks.insert(0, task);
     task.status = GofileUploadStatus.uploading;
+    _log('upload', '${task.name}: mulai $size byte dari $path');
     _notify();
     _startService(task);
 
     try {
       final server = await _pickServer();
+      _log('upload', '${task.name}: server $server');
       final form = FormData();
       form.fields.add(MapEntry('token', token));
       if (folderId != null && folderId.isNotEmpty) {
@@ -156,6 +160,7 @@ class GofileUploadService extends ChangeNotifier {
       );
 
       final body = res.data ?? const <String, dynamic>{};
+      _log('upload', '${task.name}: HTTP ${res.statusCode} ${body['status']}');
       if ((body['status'] ?? '') != 'ok') {
         throw GofileUploadException((body['status'] ?? 'gagal').toString());
       }
@@ -177,6 +182,7 @@ class GofileUploadService extends ChangeNotifier {
       _notify();
       return task;
     } catch (e) {
+      _log('upload', '${task.name}: gagal $e');
       task
         ..status = GofileUploadStatus.error
         ..speed = 0
@@ -210,6 +216,9 @@ class GofileUploadService extends ChangeNotifier {
     }
   }
 
+  void _log(String tag, String message) =>
+      Diagnostics.instance.log('gofile/$tag', message);
+
   void clearFinished() {
     tasks.removeWhere((t) => !t.isActive);
     _notify();
@@ -228,6 +237,13 @@ class GofileUploadService extends ChangeNotifier {
     task._lastTick = now;
     task._lastBytes = task.sent;
 
+    if (now.difference(task._lastLog).inSeconds >= 10) {
+      task._lastLog = now;
+      _log(
+        'upload',
+        '${task.name}: ${formatSize(task.sent)} / ${formatSize(task.size)}',
+      );
+    }
     if (now.difference(task._lastNotify).inMilliseconds >= 1000) {
       task._lastNotify = now;
       NativeDownloads.notifyDownload(

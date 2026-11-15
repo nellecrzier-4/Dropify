@@ -16,6 +16,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Catat error & kejadian penting ke Download/Dropify/dropify.log.
   Diagnostics.instance.install();
+  Diagnostics.instance.log('app', 'start');
   // Edge-to-edge: konten menggambar di belakang status bar & navigation bar.
   await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   await LocaleController.instance.load();

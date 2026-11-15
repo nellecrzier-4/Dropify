@@ -54,7 +54,8 @@ class Diagnostics {
     final line = '[$stamp] $tag: $message';
     debugPrint(line);
     _buffer.add(line);
-    _flush ??= Timer(const Duration(seconds: 2), _write);
+    // Tulis segera: kalau proses mati mendadak, catatan tetap ada di berkas.
+    _flush ??= Timer(const Duration(milliseconds: 200), _write);
   }
 
   Future<void> _write() async {
