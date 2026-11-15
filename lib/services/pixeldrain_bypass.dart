@@ -1,3 +1,5 @@
+import 'package:shared_preferences/shared_preferences.dart';
+
 /// Pembuat link download Pixeldrain lewat mirror bypass.
 ///
 /// Aplikasi tidak memakai direct link Pixeldrain untuk mengunduh. Setiap kali
@@ -12,6 +14,30 @@
 ///   folder: https://<mirror>/dzip/<folderId>
 class PixeldrainBypass {
   PixeldrainBypass._();
+
+  static const String _prefEnabled = 'bypass_enabled';
+  static const String _prefMirror = 'bypass_mirror';
+
+  /// Muat pilihan pengguna (sakelar di Settings).
+  static Future<void> load() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _enabled = prefs.getBool(_prefEnabled) ?? _enabled;
+      final saved = prefs.getString(_prefMirror);
+      if (saved != null && saved.trim().isNotEmpty) {
+        _mirror = saved.trim();
+      }
+    } catch (_) {}
+  }
+
+  /// Nyalakan/matikan mirror bypass; disimpan supaya bertahan setelah restart.
+  static Future<void> setEnabled(bool value) async {
+    _enabled = value;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_prefEnabled, value);
+    } catch (_) {}
+  }
 
   /// Mirror default. Ganti di sini kalau domainnya berubah.
   static const String defaultMirror = 'cdn.pixeldrain.eu.cc';

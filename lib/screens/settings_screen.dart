@@ -8,6 +8,7 @@ import '../l10n/locale_controller.dart';
 import '../services/app_settings.dart';
 import '../services/cache_cleaner.dart';
 import '../services/native_downloads.dart';
+import '../services/pixeldrain_bypass.dart';
 import '../services/proxy_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/theme_controller.dart';
@@ -326,6 +327,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                     await settings.setNotifications(v);
                                     if (!v) return;
                                     await NativeDownloads.requestPermissions();
+                                  },
+                                ),
+                              ),
+                              const _RowDivider(),
+                              _SettingRow(
+                                icon: Icons.bolt_rounded,
+                                title: 'Bypass limit Pixeldrain',
+                                subtitle: PixeldrainBypass.enabled
+                                    ? 'Aktif · mirror ${PixeldrainBypass.mirror}'
+                                    : 'Nonaktif · memakai server Pixeldrain',
+                                trailing: Switch(
+                                  value: PixeldrainBypass.enabled,
+                                  onChanged: (v) async {
+                                    await PixeldrainBypass.setEnabled(v);
+                                    if (mounted) setState(() {});
                                   },
                                 ),
                               ),
