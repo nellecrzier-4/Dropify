@@ -142,7 +142,7 @@ class _HomeScreenState extends State<HomeScreen> {
             bottom: 0,
             child: SafeArea(
               top: false,
-              minimum: const EdgeInsets.only(bottom: 12),
+              minimum: const EdgeInsets.only(bottom: 8),
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: GlassNav(
@@ -175,7 +175,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           Positioned(
             right: 20,
-            bottom: 118 + safeBottom,
+            bottom: 92 + safeBottom,
             child: _AddFab(onTap: _showAddMenu, open: _addOpen),
           ),
         ],
@@ -234,7 +234,7 @@ class _AddMenuSheet extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.only(left: 2, bottom: 6),
+              padding: const EdgeInsets.only(left: 2, top: 2, bottom: 12),
               child: Text(
                 title,
                 style: TextStyle(

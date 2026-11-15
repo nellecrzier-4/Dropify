@@ -304,7 +304,7 @@ class _FolderViewState extends State<FolderView> {
               },
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 140),
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 110),
                 children: [
                   if (widget.root)
                     Stagger(

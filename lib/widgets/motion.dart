@@ -693,9 +693,11 @@ class _SheetPageState extends State<_SheetPage> {
             // gesture bar / tepi layar.
             ? SafeArea(
                 top: false,
-                minimum: const EdgeInsets.only(bottom: 10),
+                minimum: const EdgeInsets.only(bottom: 12),
                 child: Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
+                  // Napas di atas & bawah isi sheet; konten sheet sendiri
+                  // tidak lagi menempel ke sudut lengkung.
+                  padding: const EdgeInsets.fromLTRB(0, 14, 0, 10),
                   child: builder(context),
                 ),
               )

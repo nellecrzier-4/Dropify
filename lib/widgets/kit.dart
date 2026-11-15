@@ -795,156 +795,106 @@ class GlassNav extends StatelessWidget {
   final ValueChanged<int> onTap;
   final Widget? trailing;
 
-  static const double _barHeight = 62;
-  static const double _bubble = 62;
-  static const double _lift = 31; // setengah lingkaran menonjol di atas bar
-
   @override
   Widget build(BuildContext context) {
     final scheme = AppColors.scheme;
-    final dark = AppColors.isDark;
-    // Dock selalu gelap (seperti referensi); di tema gelap pakai surface tinggi.
-    final barColor =
-        dark ? scheme.surfaceContainerHighest : const Color(0xFF14131A);
+    const barHeight = 56.0;
+    const pad = 8.0;
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final width = constraints.maxWidth;
-        final segment = width / items.length;
-        final center = (index + 0.5) * segment;
-
-        return SizedBox(
-          width: width,
-          height: _barHeight + _lift,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Positioned.fill(
-                child: CustomPaint(
-                  painter: _DockPainter(
-                    color: barColor,
-                    // semua posisi tab: lingkaran digambar hanya di tab aktif
-                    centers: [
-                      for (var i = 0; i < items.length; i++)
-                        ((i + 0.5) * segment, i == index),
-                    ],
-                  ),
-                ),
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(AppRadii.pill),
+        boxShadow: AppColors.shadowMd,
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(AppRadii.pill),
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+          child: Container(
+            padding: const EdgeInsets.all(pad),
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerHigh.withValues(
+                alpha: AppColors.isDark ? 0.80 : 0.86,
               ),
-              // Ikon di dalam bar.
-              Positioned(
-                left: 0,
-                right: 0,
-                top: _lift,
-                height: _barHeight,
-                child: Row(
-                  children: [
-                    for (var i = 0; i < items.length; i++)
-                      Expanded(
-                        child: _DockItem(
-                          item: items[i],
-                          selected: i == index,
-                          accent: scheme.primaryContainer,
-                          onTap: () => onTap(i),
+              borderRadius: BorderRadius.circular(AppRadii.pill),
+              border: Border.all(
+                color: scheme.outlineVariant.withValues(alpha: 0.5),
+                width: 0.6,
+              ),
+            ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final trailingWidth = trailing == null ? 0.0 : 56.0;
+                final usable = constraints.maxWidth - trailingWidth;
+                final segment = usable / items.length;
+
+                return SizedBox(
+                  height: barHeight,
+                  child: Stack(
+                    children: [
+                      // Indikator seleksi: lebar TETAP per segmen, hanya
+                      // digeser — jadi bar tidak pernah berubah ukuran /
+                      // bergoyang saat pindah tab.
+                      AnimatedPositioned(
+                        duration: Motion.slow,
+                        curve: Motion.spring,
+                        left: segment * index + 2,
+                        top: 0,
+                        bottom: 0,
+                        width: segment - 4,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: scheme.secondaryContainer,
+                            borderRadius:
+                                BorderRadius.circular(AppRadii.pill),
+                          ),
                         ),
                       ),
-                  ],
-                ),
-              ),
-              // Ikon tab aktif di dalam lingkaran.
-              AnimatedPositioned(
-                duration: Motion.slow,
-                curve: Motion.spring,
-                left: center - _bubble / 2,
-                top: 0,
-                width: _bubble,
-                height: _bubble,
-                child: IgnorePointer(
-                  child: Center(
-                    child: Icon(
-                      items[index].activeIcon ?? items[index].icon,
-                      size: 26,
-                      color: Colors.white,
-                    ),
+                      Row(
+                        children: [
+                          for (var i = 0; i < items.length; i++)
+                            SizedBox(
+                              width: segment,
+                              child: _NavItem(
+                                item: items[i],
+                                selected: i == index,
+                                onTap: () => onTap(i),
+                              ),
+                            ),
+                          if (trailing != null)
+                            SizedBox(
+                              width: trailingWidth,
+                              child: Center(child: trailing),
+                            ),
+                        ],
+                      ),
+                    ],
                   ),
-                ),
-              ),
-            ],
+                );
+              },
+            ),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }
 
-/// Bar dock dengan tonjolan lingkaran pada tab aktif.
-class _DockPainter extends CustomPainter {
-  _DockPainter({required this.color, required this.centers});
-
-  final Color color;
-  final List<(double, bool)> centers;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final barTop = size.height - GlassNav._barHeight;
-    final radius = GlassNav._barHeight / 2;
-    var path = Path()
-      ..addRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(0, barTop, size.width, GlassNav._barHeight),
-          Radius.circular(radius),
-        ),
-      );
-
-    for (final (cx, active) in centers) {
-      if (!active) continue;
-      final bubble = Path()
-        ..addOval(
-          Rect.fromCircle(
-            center: Offset(cx, barTop),
-            radius: GlassNav._bubble / 2,
-          ),
-        );
-      path = Path.combine(PathOperation.union, path, bubble);
-    }
-
-    canvas.saveLayer(Offset.zero & size, Paint());
-    canvas.drawPath(path, Paint()..color = color);
-    // Fillet: potong sedikit di kedua sisi tonjolan supaya lekukannya halus.
-    final cut = Paint()..blendMode = BlendMode.clear;
-    for (final (cx, active) in centers) {
-      if (!active) continue;
-      for (final dx in [-1, 1]) {
-        canvas.drawCircle(
-          Offset(cx + dx * (GlassNav._bubble / 2 + 6), barTop - 2),
-          10,
-          cut,
-        );
-      }
-    }
-    canvas.restore();
-  }
-
-  @override
-  bool shouldRepaint(covariant _DockPainter old) =>
-      old.color != color || old.centers != centers;
-}
-
-class _DockItem extends StatelessWidget {
-  const _DockItem({
+class _NavItem extends StatelessWidget {
+  const _NavItem({
     required this.item,
     required this.selected,
-    required this.accent,
     required this.onTap,
   });
 
   final GlassNavItem item;
   final bool selected;
-  final Color accent;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final scheme = AppColors.scheme;
+
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () {
@@ -952,14 +902,43 @@ class _DockItem extends StatelessWidget {
         onTap();
       },
       child: Center(
-        child: AnimatedScale(
-          scale: selected ? 0 : 1,
-          duration: Motion.base,
-          curve: Motion.spring,
-          child: Icon(
-            item.icon,
-            size: 25,
-            color: Colors.white.withValues(alpha: 0.72),
+        child: ClipRect(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AnimatedScale(
+                scale: selected ? 1 : 0.94,
+                duration: Motion.base,
+                curve: Motion.spring,
+                child: Icon(
+                  selected ? (item.activeIcon ?? item.icon) : item.icon,
+                  size: 22,
+                  color: selected
+                      ? scheme.onSecondaryContainer
+                      : scheme.onSurfaceVariant,
+                ),
+              ),
+              AnimatedSize(
+                duration: Motion.slow,
+                curve: Motion.spring,
+                alignment: Alignment.centerLeft,
+                child: selected
+                    ? Padding(
+                        padding: const EdgeInsets.only(left: 8),
+                        child: Text(
+                          item.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: scheme.onSecondaryContainer,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      )
+                    : const SizedBox(width: 0, height: 0),
+              ),
+            ],
           ),
         ),
       ),

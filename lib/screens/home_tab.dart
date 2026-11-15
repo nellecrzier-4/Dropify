@@ -39,7 +39,7 @@ class HomeTab extends StatelessWidget {
             onRefresh: ctrl.refresh,
             child: ListView(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(18, 8, 18, 140),
+              padding: const EdgeInsets.fromLTRB(18, 8, 18, 110),
               children: [
                 stagger(
                   _Header(
