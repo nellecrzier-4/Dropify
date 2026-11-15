@@ -120,7 +120,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     onPressed: _toggleLanguage,
                     icon: const Icon(Icons.translate_rounded, size: 17),
                     label: Text(
-                      s.languageCode == 'id' ? 'English' : 'Bahasa',
+                      s.switchLanguage,
                       style: const TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 13,

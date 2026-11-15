@@ -5,6 +5,8 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
+import '../l10n/app_strings.dart';
+import '../l10n/locale_controller.dart';
 import '../models/pd_item.dart';
 import '../utils/file_types.dart';
 import 'app_settings.dart';
@@ -354,7 +356,7 @@ class DownloadService extends ChangeNotifier {
       }
       task
         ..status = DownloadStatus.error
-        ..error = 'Link: ${probe.error ?? 'tidak bisa diakses'}'
+        ..error = 'Link: ${probe.error ?? _s.probeUnreachable}'
         ..endedAt = DateTime.now();
       _notify();
       return;
@@ -402,7 +404,7 @@ class DownloadService extends ChangeNotifier {
         );
         return;
       }
-      task.bypassError = last?.error ?? 'gagal';
+      task.bypassError = last?.error ?? _s.probeFailed;
       if (task.bypassError == 'rate_limited') {
         task
           ..status = DownloadStatus.error
@@ -429,7 +431,7 @@ class DownloadService extends ChangeNotifier {
       return;
     }
 
-    final directError = directProbe.error ?? 'gagal';
+    final directError = directProbe.error ?? _s.probeFailed;
     final rateLimited =
         directError == 'rate_limited' || task.bypassError == 'rate_limited';
     task
@@ -545,7 +547,7 @@ class DownloadService extends ChangeNotifier {
       title: task.name,
       text: '',
       progress: 0,
-      error: message == 'storage_permission' ? 'Izin akses file diperlukan' : message,
+      error: message == 'storage_permission' ? _s.fileAccessRequired : message,
     );
     _notify();
   }
@@ -664,13 +666,13 @@ class DownloadService extends ChangeNotifier {
 
       final receivedSum = chunks.fold<int>(0, (a, c) => a + c.received);
       if (receivedSum < size) {
-        throw _RetryableError('koneksi berhenti sebelum selesai');
+        throw _RetryableError(_s.connectionDropped);
       }
 
       await raf.flush();
       final length = await raf.length();
       if (length != size) {
-        throw _RetryableError('ukuran file tidak sesuai ($length/$size byte)');
+        throw _RetryableError(_s.sizeMismatch(length, size));
       }
       task.received = size;
     } finally {
@@ -751,7 +753,7 @@ class DownloadService extends ChangeNotifier {
         }
 
         if (chunk.offset <= chunk.end) {
-          throw _RetryableError('potongan belum selesai');
+          throw _RetryableError(_s.chunkIncomplete);
         }
       } catch (e) {
         if (task.canceled || _disposed) return;
@@ -838,7 +840,7 @@ class DownloadService extends ChangeNotifier {
       try {
         await part.delete();
       } catch (_) {}
-      throw _RetryableError('rentang tidak valid');
+      throw _RetryableError(_s.invalidRange);
     }
     if (code != 200 && code != 206) {
       throw PixeldrainException('HTTP $code');
@@ -872,7 +874,7 @@ class DownloadService extends ChangeNotifier {
     }
 
     if (task.size > 0 && received < task.size) {
-      throw _RetryableError('koneksi berhenti sebelum selesai');
+      throw _RetryableError(_s.connectionDropped);
     }
     task.received = received;
   }
@@ -936,29 +938,29 @@ class DownloadService extends ChangeNotifier {
     return clean;
   }
 
+  /// Teks error sesuai bahasa aktif.
+  AppStrings get _s => LocaleController.instance.strings;
+
   String _friendlyError(Object? error) {
-    if (error == null) return 'Download gagal.';
+    if (error == null) return _s.downloadFailed;
     if (error is PixeldrainException) return error.message;
     if (error is _RetryableError) return error.message;
     if (error is DioException) {
       final code = error.response?.statusCode ?? 0;
-      if (code == 404) return 'File tidak ditemukan di Pixeldrain.';
-      if (code == 403) {
-        return 'Server menolak (HTTP 403) — biasanya batas unduhan Pixeldrain '
-            'sudah tercapai atau file dibatasi. Coba lagi nanti / buka di browser.';
-      }
-      if (code == 401) return 'Akses file ditolak (HTTP 401).';
-      if (code == 429) return 'Server masih membatasi. Coba lagi nanti.';
-      if (code >= 500) return 'Server download bermasalah (HTTP $code).';
+      if (code == 404) return _s.fileNotFoundOnPixeldrain;
+      if (code == 403) return _s.downloadBlocked;
+      if (code == 401) return _s.downloadDenied;
+      if (code == 429) return _s.serverRateLimited;
+      if (code >= 500) return _s.serverError(code);
       switch (error.type) {
         case DioExceptionType.connectionTimeout:
         case DioExceptionType.receiveTimeout:
         case DioExceptionType.sendTimeout:
-          return 'Koneksi timeout. Coba lagi.';
+          return _s.connectionTimeout;
         case DioExceptionType.connectionError:
-          return 'Tidak ada koneksi internet.';
+          return _s.noInternet;
         default:
-          return error.message ?? 'Download gagal.';
+          return error.message ?? _s.downloadFailed;
       }
     }
     final text = error.toString();

@@ -380,7 +380,7 @@ class _SpeedArt extends StatelessWidget {
               Icon(Icons.bolt_rounded, size: 18, color: const Color(0xFF9CCBFF)),
               const SizedBox(width: 5),
               Text(
-                '8 connections',
+                context.s.connectionsBadge(8),
                 style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.72),
                   fontSize: 12,
@@ -395,8 +395,8 @@ class _SpeedArt extends StatelessWidget {
                   color: Colors.white.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(AppRadii.pill),
                 ),
-                child: const Text(
-                  'LIVE',
+                child: Text(
+                  context.s.liveBadge,
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 9.5,
@@ -486,7 +486,7 @@ class _ProgressArt extends StatelessWidget {
                 child: StatRow(
                   icon: Icons.speed_rounded,
                   value: '12.4 MB/s',
-                  label: 'Kecepatan',
+                  label: context.s.speedLabel,
                 ),
               ),
               Container(
@@ -499,7 +499,7 @@ class _ProgressArt extends StatelessWidget {
                 child: StatRow(
                   icon: Icons.timer_outlined,
                   value: '00:12',
-                  label: 'Sisa waktu',
+                  label: context.s.timeLeftLabel,
                 ),
               ),
             ],

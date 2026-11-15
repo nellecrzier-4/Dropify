@@ -35,7 +35,7 @@ class SyncCard extends StatelessWidget {
       title = s.syncedTitle;
       subtitle = ctrl.lastSync == null
           ? null
-          : s.filesAgo(ctrl.files.length, formatAgo(ctrl.lastSync!));
+          : s.filesAgo(ctrl.files.length, formatAgo(ctrl.lastSync!, s));
       icon = Icons.cloud_done_outlined;
     }
 

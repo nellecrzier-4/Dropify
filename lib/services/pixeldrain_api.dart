@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../l10n/app_strings.dart';
+import '../l10n/locale_controller.dart';
 import '../models/pd_item.dart';
 
 class LoginResult {
@@ -33,6 +35,9 @@ class PixeldrainException implements Exception {
 
 class PixeldrainApi {
   static const _keyPref = 'pd_auth_key';
+
+  /// Teks error sesuai bahasa aktif.
+  AppStrings get _s => LocaleController.instance.strings;
 
   final Dio _dio = Dio(
     BaseOptions(
@@ -108,45 +113,44 @@ class PixeldrainApi {
       final code = body['value'] as String? ?? '';
       switch (code) {
         case 'user_not_found':
-          return const LoginResult(
+          return LoginResult(
               success: false,
               code: 'user_not_found',
-              message: 'Username / email tidak ditemukan.');
+              message: _s.loginError('user_not_found', ''));
         case 'password_incorrect':
-          return const LoginResult(
+          return LoginResult(
               success: false,
               code: 'password_incorrect',
-              message: 'Password salah.');
+              message: _s.loginError('password_incorrect', ''));
         case 'otp_required':
-          return const LoginResult(
+          return LoginResult(
               success: false,
               code: 'otp_required',
               needsOtp: true,
-              message: 'Akun ini memakai 2FA. Masukkan kode 6 digit.');
+              message: _s.loginError('otp_required', ''));
         case 'otp_incorrect':
-          return const LoginResult(
+          return LoginResult(
               success: false,
               code: 'otp_incorrect',
               needsOtp: true,
-              message: 'Kode 2FA salah.');
+              message: _s.loginError('otp_incorrect', ''));
         case 'ip_rate_limit_reached':
-          return const LoginResult(
+          return LoginResult(
               success: false,
               code: 'rate_limited',
-              message: 'Terlalu banyak percobaan login. Coba lagi nanti.');
+              message: _s.loginError('rate_limited', ''));
         default:
           final msg = body['message'] as String?;
           return LoginResult(
             success: false,
-            message: msg ??
-                'Login gagal (HTTP ${response.statusCode}). Coba lagi.',
+            message: msg ?? _s.loginFailedHttp(response.statusCode ?? 0),
           );
       }
     } on DioException catch (e) {
       return LoginResult(
         success: false,
         code: 'network',
-        message: 'Gagal terhubung ke Pixeldrain: ${e.message ?? e.type.name}',
+        message: _s.connectionFailed(e.message ?? e.type.name),
       );
     } catch (e) {
       return LoginResult(success: false, message: 'Error: $e');
@@ -189,8 +193,7 @@ class PixeldrainApi {
     } on PixeldrainException {
       rethrow;
     } on DioException catch (e) {
-      throw PixeldrainException(
-          'Gagal terhubung ke Pixeldrain: ${e.message ?? e.type.name}');
+      throw PixeldrainException(_s.connectionFailed(e.message ?? e.type.name));
     }
   }
 
@@ -200,15 +203,12 @@ class PixeldrainApi {
     final body = _asMap(response.data);
 
     if (filesystem && (code == 401 || code == 403)) {
-      throw PixeldrainException(
-        'Fitur folder (filesystem) hanya tersedia untuk akun Pixeldrain '
-        'berlangganan Pro. File kamu tetap bisa diakses lewat "All uploads".',
-      );
+      throw PixeldrainException(_s.proFeatureBody);
     }
 
     final msg = (body['message'] ?? body['value'] ?? 'HTTP $code').toString();
     throw PixeldrainException(
-      code == 401 || code == 403 ? 'Sesi habis, silakan login ulang.' : msg,
+      code == 401 || code == 403 ? _s.sessionExpired : msg,
       unauthorized: code == 401 || code == 403,
     );
   }

@@ -4,6 +4,8 @@ import 'dart:math' as math;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 
+import '../l10n/app_strings.dart';
+import '../l10n/locale_controller.dart';
 import '../models/pd_item.dart';
 import '../services/download_service.dart';
 import '../services/pixeldrain_api.dart';
@@ -33,6 +35,9 @@ class DriveController extends ChangeNotifier {
   DriveController(this.api) : downloads = DownloadService(api);
 
   final PixeldrainApi api;
+
+  /// Teks sesuai bahasa aktif (tanpa BuildContext).
+  AppStrings get _s => LocaleController.instance.strings;
 
   /// Manajer download (link bypass + progres unduhan).
   final DownloadService downloads;
@@ -189,7 +194,7 @@ class DriveController extends ChangeNotifier {
 
   /// Ganti nama file/folder filesystem.
   Future<String?> renameFsItem(PdItem item, String newName) async {
-    if (item.fsPath.isEmpty) return 'Item ini tidak bisa diganti nama.';
+    if (item.fsPath.isEmpty) return _s.itemCannotRename;
     try {
       await api.rename(item.fsPath, newName);
       return null;
@@ -200,7 +205,7 @@ class DriveController extends ChangeNotifier {
 
   /// Hapus file/folder filesystem.
   Future<String?> deleteFsItem(PdItem item) async {
-    if (item.fsPath.isEmpty) return 'Item ini tidak bisa dihapus.';
+    if (item.fsPath.isEmpty) return _s.itemCannotDelete;
     try {
       await api.deleteFs(item.fsPath, recursive: item.isDir);
       return null;
@@ -227,7 +232,7 @@ class DriveController extends ChangeNotifier {
 
   Future<String?> deleteItem(PdItem item) async {
     final id = item.id;
-    if (id == null) return 'File ini tidak bisa dihapus dari sini.';
+    if (id == null) return _s.fileCannotDeleteHere;
     try {
       await api.deleteFile(id);
       files = files.where((f) => f.id != id).toList();

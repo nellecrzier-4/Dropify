@@ -94,7 +94,7 @@ class _JoinPartsScreenState extends State<JoinPartsScreen> {
           context: context,
           builder: (d) => AlertDialog(
             title: Text(s.joinOverwriteTitle),
-            content: Text('${group.outputName} ${s.joinOverwriteBody}'),
+            content: Text(s.joinOverwriteBody(group.outputName)),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(d, false),
@@ -144,12 +144,12 @@ class _JoinPartsScreenState extends State<JoinPartsScreen> {
 
       NativeDownloads.scanFile(output.path);
       if (!mounted) return;
-      showAppSnack(context, '${s.joined} ${group.outputName}');
+      showAppSnack(context, s.joinSucceeded(group.outputName));
       await _scan();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('${s.joinFailed}: $e')));
+          .showSnackBar(SnackBar(content: Text(s.joinFailedDetail('$e'))));
     } finally {
       if (mounted) setState(() => _busy = false);
     }

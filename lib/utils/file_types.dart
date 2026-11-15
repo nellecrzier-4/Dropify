@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../l10n/app_strings.dart';
 import '../theme/app_theme.dart';
 
 enum FileCategory { archives, videos, apps, images, audio, documents, other }
 
 extension FileCategoryX on FileCategory {
-  String get label => switch (this) {
-        FileCategory.archives => 'Archives',
-        FileCategory.videos => 'Videos',
-        FileCategory.apps => 'Apps',
-        FileCategory.images => 'Images',
-        FileCategory.audio => 'Audio',
-        FileCategory.documents => 'Documents',
-        FileCategory.other => 'Other',
+  /// Nama kategori sesuai bahasa aktif.
+  String label(AppStrings s) => switch (this) {
+        FileCategory.archives => s.categoryArchives,
+        FileCategory.videos => s.categoryVideos,
+        FileCategory.apps => s.categoryApps,
+        FileCategory.images => s.categoryImages,
+        FileCategory.audio => s.categoryAudio,
+        FileCategory.documents => s.categoryDocuments,
+        FileCategory.other => s.categoryOther,
       };
 
   IconData get icon => switch (this) {
@@ -35,18 +37,16 @@ extension FileCategoryX on FileCategory {
         FileCategory.other => AppColors.other,
       };
 
-  String countLabel(int n) {
-    final s = n == 1;
-    return switch (this) {
-      FileCategory.archives => '$n ${s ? 'file' : 'files'}',
-      FileCategory.videos => '$n ${s ? 'video' : 'videos'}',
-      FileCategory.apps => '$n ${s ? 'app' : 'apps'}',
-      FileCategory.images => '$n ${s ? 'photo' : 'photos'}',
-      FileCategory.audio => '$n ${s ? 'track' : 'tracks'}',
-      FileCategory.documents => '$n ${s ? 'document' : 'documents'}',
-      FileCategory.other => '$n ${s ? 'file' : 'files'}',
-    };
-  }
+  /// Mis. "12 file" / "12 files", sesuai bahasa aktif.
+  String countLabel(int n, AppStrings strings) => switch (this) {
+        FileCategory.archives => strings.countFiles(n),
+        FileCategory.videos => strings.countVideos(n),
+        FileCategory.apps => strings.countApps(n),
+        FileCategory.images => strings.countPhotos(n),
+        FileCategory.audio => strings.countTracks(n),
+        FileCategory.documents => strings.countDocuments(n),
+        FileCategory.other => strings.countFiles(n),
+      };
 }
 
 const _archiveExt = {
@@ -106,11 +106,11 @@ String formatSize(int bytes) {
 String formatDate(DateTime? d) =>
     d == null ? '' : DateFormat('d MMM yyyy').format(d);
 
-String formatAgo(DateTime d) {
+String formatAgo(DateTime d, AppStrings strings) {
   final diff = DateTime.now().difference(d);
-  if (diff.inSeconds < 10) return 'just now';
-  if (diff.inMinutes < 1) return '${diff.inSeconds}s ago';
-  if (diff.inHours < 1) return '${diff.inMinutes} min ago';
-  if (diff.inDays < 1) return '${diff.inHours} h ago';
-  return '${diff.inDays} d ago';
+  if (diff.inSeconds < 10) return strings.justNow;
+  if (diff.inMinutes < 1) return strings.secondsAgo(diff.inSeconds);
+  if (diff.inHours < 1) return strings.minutesAgo(diff.inMinutes);
+  if (diff.inDays < 1) return strings.hoursAgo(diff.inHours);
+  return strings.daysAgo(diff.inDays);
 }

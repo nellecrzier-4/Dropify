@@ -93,7 +93,7 @@ Future<void> downloadItem(
     text,
     // Kalau server menolak (403), tawarkan buka di browser sebagai jalan lain.
     action: SnackBarAction(
-      label: forbidden && fileId.isNotEmpty ? 'Browser' : s.downloads,
+      label: forbidden && fileId.isNotEmpty ? s.browser : s.downloads,
       onPressed: () {
         if (forbidden && fileId.isNotEmpty) {
           launchUrl(
@@ -108,7 +108,14 @@ Future<void> downloadItem(
   );
 }
 
-void showItemActions(BuildContext context, DriveController ctrl, PdItem item) {
+/// [origin] = rect global widget yang ditekan; kalau ada, sheet tumbuh dari
+/// titik itu.
+void showItemActions(
+  BuildContext context,
+  DriveController ctrl,
+  PdItem item, {
+  Rect? origin,
+}) {
   final s = context.s;
   final bypass = PixeldrainBypass.linkForFileId(item.id);
   final subtitle = [
@@ -125,6 +132,8 @@ void showItemActions(BuildContext context, DriveController ctrl, PdItem item) {
   showExpressiveSheet<void>(
     context: context,
     isScrollControlled: true,
+    variant: SheetVariant.fadeThrough,
+    origin: origin,
     builder: (sheetContext) => _ItemSheet(
       title: item.name,
       subtitle: subtitle,
@@ -271,52 +280,54 @@ class _ItemSheet extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                children: [
-                  GlowIcon(icon: icon, size: 44, color: color),
-                  const SizedBox(width: 13),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: AppColors.text,
-                            fontSize: 15.5,
-                            height: 1.25,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: -0.2,
-                          ),
-                        ),
-                        if (subtitle.isNotEmpty) ...[
-                          const SizedBox(height: 3),
+              Stagger(
+                index: 0,
+                slide: 8,
+                child: Row(
+                  children: [
+                    GlowIcon(icon: icon, size: 44, color: color),
+                    const SizedBox(width: 13),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
                           Text(
-                            subtitle,
-                            maxLines: 1,
+                            title,
+                            maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              color: scheme.onSurfaceVariant,
-                              fontSize: 12,
+                              color: AppColors.text,
+                              fontSize: 15.5,
+                              height: 1.25,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.2,
                             ),
                           ),
+                          if (subtitle.isNotEmpty) ...[
+                            const SizedBox(height: 3),
+                            Text(
+                              subtitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: scheme.onSurfaceVariant,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
               const SizedBox(height: 8),
-              for (var i = 0; i < actions.length; i++)
-                Stagger(
-                  index: i,
-                  step: const Duration(milliseconds: 35),
-                  slide: 10,
-                  child: _ActionRow(action: actions[i]),
-                ),
+              ...staggered(
+                [for (final action in actions) _ActionRow(action: action)],
+                start: 1,
+                step: const Duration(milliseconds: 24),
+              ),
             ],
           ),
         ),

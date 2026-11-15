@@ -167,7 +167,7 @@ class _HeroChip extends StatelessWidget {
             Icon(stat.category.icon, size: 15, color: tint),
             const SizedBox(width: 7),
             Text(
-              '${stat.category.label} · ${formatSize(stat.size)}',
+              '${stat.category.label(context.s)} · ${formatSize(stat.size)}',
               style: TextStyle(
                 color: onTint,
                 fontSize: 12.5,

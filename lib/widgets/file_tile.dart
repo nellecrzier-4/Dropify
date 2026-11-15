@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../controllers/drive_controller.dart';
+import '../l10n/locale_controller.dart';
 import '../models/pd_item.dart';
 import '../screens/files_tab.dart';
 import '../theme/app_theme.dart';
@@ -31,7 +32,7 @@ class FileTile extends StatelessWidget {
     final scheme = AppColors.scheme;
     final color = item.isDir ? scheme.primary : cat.color;
     final subtitle = item.isDir
-        ? 'Folder'
+        ? context.s.folder
         : [formatSize(item.size), formatDate(item.date)]
             .where((e) => e.isNotEmpty)
             .join(' · ');
@@ -60,7 +61,14 @@ class FileTile extends StatelessWidget {
               }
             },
             onLongPress: onLongPress ??
-                (item.isDir ? null : () => showItemActions(context, ctrl, item)),
+                (item.isDir
+                    ? null
+                    : () => showItemActions(
+                          context,
+                          ctrl,
+                          item,
+                          origin: globalRectOf(context),
+                        )),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(12, 10, 6, 10),
               child: Row(
@@ -112,7 +120,12 @@ class FileTile extends StatelessWidget {
                     IconButton(
                       icon: Icon(Icons.more_vert_rounded,
                           color: scheme.onSurfaceVariant, size: 20),
-                      onPressed: () => showItemActions(context, ctrl, item),
+                      onPressed: () => showItemActions(
+                        context,
+                        ctrl,
+                        item,
+                        origin: globalRectOf(context),
+                      ),
                     ),
                 ],
               ),

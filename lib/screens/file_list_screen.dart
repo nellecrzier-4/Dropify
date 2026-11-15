@@ -111,7 +111,7 @@ class _FileListScreenState extends State<FileListScreen> {
                 child: const Icon(Icons.arrow_upward, size: 18),
               ),
               const SizedBox(width: 8),
-              Text(_ascending ? 'A → Z / kecil → besar' : 'Z → A / besar → kecil'),
+              Text(_ascending ? s.sortAscending : s.sortDescending),
             ],
           ),
         ),

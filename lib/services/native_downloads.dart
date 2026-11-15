@@ -1,5 +1,8 @@
 import 'package:flutter/services.dart';
 
+import '../l10n/app_strings.dart';
+import '../l10n/locale_controller.dart';
+
 /// Hasil enqueue di DownloadManager Android.
 class NativeDownloadHandle {
   const NativeDownloadHandle({
@@ -57,6 +60,9 @@ class NativeDownloadException implements Exception {
 class NativeDownloads {
   static const MethodChannel _channel = MethodChannel('com.nel.dropify/native');
 
+  /// Teks error sesuai bahasa aktif.
+  static AppStrings get _s => LocaleController.instance.strings;
+
   /// Folder tujuan yang dipakai aplikasi.
   static const String subdir = 'Dropify';
   static const String folderPath = '/storage/emulated/0/Download/Dropify';
@@ -76,7 +82,7 @@ class NativeDownloads {
         'headers': headers,
       });
       if (res == null) {
-        throw NativeDownloadException('Downloader tidak merespons.');
+        throw NativeDownloadException(_s.downloaderNotResponding);
       }
       return NativeDownloadHandle(
         id: (res['id'] as num).toInt(),
@@ -84,10 +90,9 @@ class NativeDownloads {
         path: res['path']?.toString() ?? folderPath,
       );
     } on PlatformException catch (e) {
-      throw NativeDownloadException(e.message ?? 'Gagal memulai download.');
+      throw NativeDownloadException(e.message ?? _s.downloadStartFailed);
     } on MissingPluginException {
-      throw NativeDownloadException(
-          'Downloader Android tidak tersedia di perangkat ini.');
+      throw NativeDownloadException(_s.downloaderUnavailable);
     }
   }
 

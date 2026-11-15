@@ -94,8 +94,8 @@ class HomeTab extends StatelessWidget {
                     onCategoryTap: (c) => Navigator.push(
                       context,
                       SharedAxisPageRoute(
-                        builder: (_) => FileListScreen(
-                            ctrl: ctrl, title: c.label, category: c),
+                        builder: (_) =>
+                            FileListScreen(ctrl: ctrl, title: c.label(s), category: c),
                       ),
                     ),
                   ),

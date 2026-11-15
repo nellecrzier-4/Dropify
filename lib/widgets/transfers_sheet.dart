@@ -280,8 +280,7 @@ class _TransferRow extends StatelessWidget {
                 if (progress != null) ...[
                   const SizedBox(height: 9),
                   TweenAnimationBuilder<double>(
-                    tween:
-                        Tween(begin: 0, end: progress!.clamp(0.0, 1.0)),
+                    tween: Tween(begin: 0, end: progress!.clamp(0.0, 1.0)),
                     duration: Motion.slow,
                     curve: Motion.emphasized,
                     builder: (context, value, _) => WaveProgressBar(
@@ -337,80 +336,90 @@ class _DownloadsTab extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                children: [
-                  GlowIcon(
-                    icon: Icons.error_outline_rounded,
-                    size: 44,
-                    color: AppColors.danger,
-                  ),
-                  const SizedBox(width: 13),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          task.name,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: AppColors.text,
-                            fontSize: 15.5,
-                            height: 1.25,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: -0.2,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          describeDownloadError(
-                            context,
-                            task.error ?? s.downloadDetails,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: AppColors.danger,
-                            fontSize: 12,
-                            height: 1.35,
-                          ),
-                        ),
-                      ],
+              Stagger(
+                index: 0,
+                slide: 8,
+                child: Row(
+                  children: [
+                    GlowIcon(
+                      icon: Icons.error_outline_rounded,
+                      size: 44,
+                      color: AppColors.danger,
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 13),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            task.name,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: AppColors.text,
+                              fontSize: 15.5,
+                              height: 1.25,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.2,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            describeDownloadError(
+                              context,
+                              task.error ?? s.downloadDetails,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: AppColors.danger,
+                              fontSize: 12,
+                              height: 1.35,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 10),
-              if (task.url != null)
-                _DetailAction(
-                  icon: Icons.link_rounded,
-                  title: s.copyLink,
-                  subtitle: task.url,
-                  onTap: () {
-                    Clipboard.setData(ClipboardData(text: task.url!));
-                    Navigator.pop(sheetContext);
-                  },
-                ),
-              _DetailAction(
-                icon: Icons.refresh_rounded,
-                title: s.retry,
-                subtitle: s.attemptInfo(
-                  task.attempts,
-                  task.viaBypass ? s.viaBypass : s.viaPixeldrain,
-                ),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  controller.downloads.retry(task.id);
-                },
-              ),
-              _DetailAction(
-                icon: Icons.public_rounded,
-                title: s.tryPixeldrain,
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  controller.downloads.retryWithoutBypass(task.id);
-                },
+              ...staggered(
+                <Widget>[
+                  if (task.url != null)
+                    _DetailAction(
+                      icon: Icons.link_rounded,
+                      title: s.copyLink,
+                      subtitle: task.url,
+                      onTap: () {
+                        Clipboard.setData(ClipboardData(text: task.url!));
+                        Navigator.pop(sheetContext);
+                      },
+                    ),
+                  _DetailAction(
+                    icon: Icons.refresh_rounded,
+                    title: s.retry,
+                    subtitle: s.attemptInfo(
+                      task.attempts,
+                      task.viaBypass ? s.viaBypass : s.viaPixeldrain,
+                    ),
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      controller.downloads.retry(task.id);
+                    },
+                  ),
+                  _DetailAction(
+                    icon: Icons.public_rounded,
+                    title: s.tryPixeldrain,
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      controller.downloads.retryWithoutBypass(task.id);
+                    },
+                  ),
+                ],
+                start: 1,
+                step: const Duration(milliseconds: 24),
               ),
             ],
           ),
@@ -420,7 +429,8 @@ class _DownloadsTab extends StatelessWidget {
   }
 
   Future<void> _open(BuildContext context, DownloadTask task) async {
-    final ok = await ctrl.downloads.openFile(task)
+    final ok = await ctrl.downloads
+        .openFile(task)
         .then((_) => true)
         .catchError((_) => false);
     if (!ok && context.mounted) {
@@ -506,7 +516,8 @@ class _DownloadsTab extends StatelessWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: failed ? AppColors.danger : AppColors.scheme.onSurfaceVariant,
+              color:
+                  failed ? AppColors.danger : AppColors.scheme.onSurfaceVariant,
               fontSize: 12,
               height: 1.35,
             ),
@@ -562,7 +573,9 @@ class _EmptyTransfers extends StatelessWidget {
                 OrbIcon(icon: icon, size: 96),
                 const SizedBox(height: 16),
                 Text(
-                  emptyKey == _EmptyKind.downloads ? s.noDownloads : s.noUploads,
+                  emptyKey == _EmptyKind.downloads
+                      ? s.noDownloads
+                      : s.noUploads,
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: AppColors.scheme.onSurfaceVariant,

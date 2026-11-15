@@ -129,10 +129,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             children: [
                               _SettingRow(
                                 icon: Icons.translate_rounded,
-                                title: s.followSystem,
-                                subtitle: locale.locale.languageCode == 'id'
-                                    ? 'Bahasa Indonesia'
-                                    : 'English',
+                                title: s.languageFollowSystem,
+                                subtitle: locale.deviceLanguageName,
                                 selected: locale.mode == AppLanguage.system,
                                 onTap: () =>
                                     locale.setMode(AppLanguage.system),
@@ -143,7 +141,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               const _RowDivider(),
                               _SettingRow(
                                 icon: Icons.language_rounded,
-                                title: s.english,
+                                title: s.languageEnglish,
                                 selected: locale.mode == AppLanguage.english,
                                 onTap: () =>
                                     locale.setMode(AppLanguage.english),

@@ -1,3 +1,4 @@
+import '../l10n/locale_controller.dart';
 import 'native_downloads.dart';
 
 /// Menjaga satu foreground service selama masih ada upload atau download,
@@ -24,7 +25,8 @@ class TransferSession {
     if (_uploadsActive || _downloadsActive) {
       if (!_running) {
         _running = true;
-        NativeDownloads.startTransferService('Transfer berjalan');
+        NativeDownloads.startTransferService(
+          LocaleController.instance.strings.transferRunning);
       }
     } else if (_running) {
       _running = false;

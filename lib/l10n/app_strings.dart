@@ -48,8 +48,8 @@ abstract class AppStrings {
   String get recent;
   String get logout;
   String get language;
-  String get followSystem;
-  String get english;
+  String get languageFollowSystem;
+  String get languageEnglish;
   String get languageSubtitle;
   String get settings;
   String get appearance;
@@ -118,10 +118,7 @@ abstract class AppStrings {
   String get noPartsFound;
   String get parts;
   String get merge;
-  String get joined;
-  String get joinFailed;
   String get joinOverwriteTitle;
-  String get joinOverwriteBody;
   String get clearCache;
   String get cacheCleared;
   String get canceled;
@@ -194,6 +191,71 @@ abstract class AppStrings {
   String get alreadyDownloaded;
   String downloadingSnack(String name);
   String downloadStartedSnack(String name);
+
+  // --- Sapuan teks tersisa (label, dialog, snackbar, error) ---
+  String get folder;
+  String get itemCannotRename;
+  String get itemCannotDelete;
+  String get fileCannotDeleteHere;
+  String get sortAscending;
+  String get sortDescending;
+  String get switchLanguage;
+  String connectionsBadge(int count);
+  String get liveBadge;
+  String get speedLabel;
+  String get timeLeftLabel;
+
+  // Label waktu relatif (dulu English-only di formatAgo)
+  String get justNow;
+  String secondsAgo(int seconds);
+  String minutesAgo(int minutes);
+  String hoursAgo(int hours);
+  String daysAgo(int days);
+
+  // Kategori file (dulu English-only di file_types)
+  String get categoryArchives;
+  String get categoryVideos;
+  String get categoryApps;
+  String get categoryImages;
+  String get categoryAudio;
+  String get categoryDocuments;
+  String get categoryOther;
+  String countFiles(int count);
+  String countVideos(int count);
+  String countApps(int count);
+  String countPhotos(int count);
+  String countTracks(int count);
+  String countDocuments(int count);
+
+  // Gabung bagian
+  String joinOverwriteBody(String name);
+  String joinSucceeded(String name);
+  String joinFailedDetail(String error);
+
+  // Pesan dari service (API, downloader, notifikasi transfer)
+  String get sessionExpired;
+  String connectionFailed(String detail);
+  String loginFailedHttp(int code);
+  String get downloadFailed;
+  String get fileNotFoundOnPixeldrain;
+  String get downloadBlocked;
+  String get downloadDenied;
+  String get serverRateLimited;
+  String serverError(int code);
+  String get connectionTimeout;
+  String get noInternet;
+  String get fileAccessRequired;
+  String get transferRunning;
+  String get browser;
+  String get probeUnreachable;
+  String get probeFailed;
+  String get connectionDropped;
+  String sizeMismatch(int received, int expected);
+  String get chunkIncomplete;
+  String get invalidRange;
+  String get downloaderNotResponding;
+  String get downloadStartFailed;
+  String get downloaderUnavailable;
 }
 
 class StringsId extends AppStrings {
@@ -326,10 +388,10 @@ class StringsId extends AppStrings {
   String get language => 'Bahasa';
 
   @override
-  String get followSystem => 'Ikuti sistem';
+  String get languageFollowSystem => 'Ikuti sistem';
 
   @override
-  String get english => 'English';
+  String get languageEnglish => 'English';
 
   @override
   String get languageSubtitle => 'Hanya English yang tersedia selain sistem.';
@@ -530,16 +592,7 @@ class StringsId extends AppStrings {
   String get merge => 'Gabung';
 
   @override
-  String get joined => 'Selesai digabung:';
-
-  @override
-  String get joinFailed => 'Gagal menggabung';
-
-  @override
   String get joinOverwriteTitle => 'File sudah ada';
-
-  @override
-  String get joinOverwriteBody => 'sudah ada. Timpa?';
 
   @override
   String get clearCache => 'Bersihkan cache';
@@ -757,6 +810,178 @@ class StringsId extends AppStrings {
   @override
   String downloadStartedSnack(String name) =>
       'Mengunduh $name → Download/Dropify';
+
+  // --- Sapuan teks tersisa ---
+  @override
+  String get folder => 'Folder';
+
+  @override
+  String get itemCannotRename => 'Item ini tidak bisa diganti nama.';
+
+  @override
+  String get itemCannotDelete => 'Item ini tidak bisa dihapus.';
+
+  @override
+  String get fileCannotDeleteHere => 'File ini tidak bisa dihapus dari sini.';
+
+  @override
+  String get sortAscending => 'A → Z / kecil → besar';
+
+  @override
+  String get sortDescending => 'Z → A / besar → kecil';
+
+  @override
+  String get switchLanguage => 'English';
+
+  @override
+  String connectionsBadge(int count) => '$count koneksi';
+
+  @override
+  String get liveBadge => 'LIVE';
+
+  @override
+  String get speedLabel => 'Kecepatan';
+
+  @override
+  String get timeLeftLabel => 'Sisa waktu';
+
+  @override
+  String get justNow => 'baru saja';
+
+  @override
+  String secondsAgo(int seconds) => '$seconds dtk lalu';
+
+  @override
+  String minutesAgo(int minutes) => '$minutes mnt lalu';
+
+  @override
+  String hoursAgo(int hours) => '$hours jam lalu';
+
+  @override
+  String daysAgo(int days) => '$days hari lalu';
+
+  @override
+  String get categoryArchives => 'Arsip';
+
+  @override
+  String get categoryVideos => 'Video';
+
+  @override
+  String get categoryApps => 'Aplikasi';
+
+  @override
+  String get categoryImages => 'Gambar';
+
+  @override
+  String get categoryAudio => 'Audio';
+
+  @override
+  String get categoryDocuments => 'Dokumen';
+
+  @override
+  String get categoryOther => 'Lainnya';
+
+  @override
+  String countFiles(int count) => '$count file';
+
+  @override
+  String countVideos(int count) => '$count video';
+
+  @override
+  String countApps(int count) => '$count aplikasi';
+
+  @override
+  String countPhotos(int count) => '$count foto';
+
+  @override
+  String countTracks(int count) => '$count lagu';
+
+  @override
+  String countDocuments(int count) => '$count dokumen';
+
+  @override
+  String joinOverwriteBody(String name) =>
+      '$name sudah ada di Download/Dropify. Timpa?';
+
+  @override
+  String joinSucceeded(String name) => 'Selesai digabung: $name';
+
+  @override
+  String joinFailedDetail(String error) => 'Gagal menggabung: $error';
+
+  @override
+  String get sessionExpired => 'Sesi habis, silakan login ulang.';
+
+  @override
+  String connectionFailed(String detail) =>
+      'Gagal terhubung ke Pixeldrain: $detail';
+
+  @override
+  String loginFailedHttp(int code) => 'Login gagal (HTTP $code). Coba lagi.';
+
+  @override
+  String get downloadFailed => 'Download gagal.';
+
+  @override
+  String get fileNotFoundOnPixeldrain => 'File tidak ditemukan di Pixeldrain.';
+
+  @override
+  String get downloadBlocked =>
+      'Server menolak (HTTP 403) — biasanya batas unduhan Pixeldrain sudah '
+      'tercapai atau file dibatasi. Coba lagi nanti / buka di browser.';
+
+  @override
+  String get downloadDenied => 'Akses file ditolak (HTTP 401).';
+
+  @override
+  String get serverRateLimited => 'Server masih membatasi. Coba lagi nanti.';
+
+  @override
+  String serverError(int code) => 'Server download bermasalah (HTTP $code).';
+
+  @override
+  String get connectionTimeout => 'Koneksi timeout. Coba lagi.';
+
+  @override
+  String get noInternet => 'Tidak ada koneksi internet.';
+
+  @override
+  String get fileAccessRequired => 'Izin akses file diperlukan';
+
+  @override
+  String get transferRunning => 'Transfer berjalan';
+
+  @override
+  String get browser => 'Browser';
+
+  @override
+  String get probeUnreachable => 'tidak bisa diakses';
+
+  @override
+  String get probeFailed => 'gagal';
+
+  @override
+  String get connectionDropped => 'koneksi berhenti sebelum selesai';
+
+  @override
+  String sizeMismatch(int received, int expected) =>
+      'ukuran file tidak sesuai ($received/$expected byte)';
+
+  @override
+  String get chunkIncomplete => 'potongan belum selesai';
+
+  @override
+  String get invalidRange => 'rentang tidak valid';
+
+  @override
+  String get downloaderNotResponding => 'Downloader tidak merespons.';
+
+  @override
+  String get downloadStartFailed => 'Gagal memulai download.';
+
+  @override
+  String get downloaderUnavailable =>
+      'Downloader Android tidak tersedia di perangkat ini.';
 }
 
 class StringsEn extends AppStrings {
@@ -889,10 +1114,10 @@ class StringsEn extends AppStrings {
   String get language => 'Language';
 
   @override
-  String get followSystem => 'Follow system';
+  String get languageFollowSystem => 'Follow system';
 
   @override
-  String get english => 'English';
+  String get languageEnglish => 'English';
 
   @override
   String get languageSubtitle => 'English is the only extra language for now.';
@@ -1066,49 +1291,39 @@ class StringsEn extends AppStrings {
       '$sent / $total · $speed/s';
 
   @override
-  String partOf(int index, int total) => 'Bagian $index/$total';
+  String partOf(int index, int total) => 'Part $index/$total';
 
   @override
-  String get joinParts => 'Gabung bagian';
+  String get joinParts => 'Join parts';
 
   @override
   String get joinPartsHint =>
-      'Gabungkan file multi-bagian (nama.part1, nama.part2, …) jadi satu file.';
+      'Combine multi-part files (name.part1, name.part2, …) into a single file.';
 
   @override
-  String get deletePartsAfter => 'Hapus bagian setelah digabung';
+  String get deletePartsAfter => 'Delete parts after joining';
 
   @override
   String get deletePartsHint =>
-      'Menghemat ruang; file hasil gabungan tetap disimpan.';
+      'Saves space; the joined file is kept.';
 
   @override
-  String get noPartsFound =>
-      'Tidak ada file multi-bagian di Download/Dropify.';
+  String get noPartsFound => 'No multi-part files in Download/Dropify.';
 
   @override
-  String get parts => 'bagian';
+  String get parts => 'parts';
 
   @override
-  String get merge => 'Gabung';
+  String get merge => 'Join';
 
   @override
-  String get joined => 'Selesai digabung:';
+  String get joinOverwriteTitle => 'File already exists';
 
   @override
-  String get joinFailed => 'Gagal menggabung';
+  String get clearCache => 'Clear cache';
 
   @override
-  String get joinOverwriteTitle => 'File sudah ada';
-
-  @override
-  String get joinOverwriteBody => 'sudah ada. Timpa?';
-
-  @override
-  String get clearCache => 'Bersihkan cache';
-
-  @override
-  String get cacheCleared => 'Cache dibersihkan';
+  String get cacheCleared => 'Cache cleared';
 
   @override
   String get canceled => 'Canceled';
@@ -1320,4 +1535,180 @@ class StringsEn extends AppStrings {
   @override
   String downloadStartedSnack(String name) =>
       'Downloading $name → Download/Dropify';
+
+  // --- Remaining literal sweep ---
+  @override
+  String get folder => 'Folder';
+
+  @override
+  String get itemCannotRename => "This item can't be renamed.";
+
+  @override
+  String get itemCannotDelete => "This item can't be deleted.";
+
+  @override
+  String get fileCannotDeleteHere => "This file can't be deleted from here.";
+
+  @override
+  String get sortAscending => 'A → Z / small → large';
+
+  @override
+  String get sortDescending => 'Z → A / large → small';
+
+  @override
+  String get switchLanguage => 'Bahasa';
+
+  @override
+  String connectionsBadge(int count) =>
+      count == 1 ? '1 connection' : '$count connections';
+
+  @override
+  String get liveBadge => 'LIVE';
+
+  @override
+  String get speedLabel => 'Speed';
+
+  @override
+  String get timeLeftLabel => 'Time left';
+
+  @override
+  String get justNow => 'just now';
+
+  @override
+  String secondsAgo(int seconds) => '${seconds}s ago';
+
+  @override
+  String minutesAgo(int minutes) => '$minutes min ago';
+
+  @override
+  String hoursAgo(int hours) => '$hours h ago';
+
+  @override
+  String daysAgo(int days) => '$days d ago';
+
+  @override
+  String get categoryArchives => 'Archives';
+
+  @override
+  String get categoryVideos => 'Videos';
+
+  @override
+  String get categoryApps => 'Apps';
+
+  @override
+  String get categoryImages => 'Images';
+
+  @override
+  String get categoryAudio => 'Audio';
+
+  @override
+  String get categoryDocuments => 'Documents';
+
+  @override
+  String get categoryOther => 'Other';
+
+  @override
+  String countFiles(int count) => count == 1 ? '1 file' : '$count files';
+
+  @override
+  String countVideos(int count) => count == 1 ? '1 video' : '$count videos';
+
+  @override
+  String countApps(int count) => count == 1 ? '1 app' : '$count apps';
+
+  @override
+  String countPhotos(int count) => count == 1 ? '1 photo' : '$count photos';
+
+  @override
+  String countTracks(int count) => count == 1 ? '1 track' : '$count tracks';
+
+  @override
+  String countDocuments(int count) =>
+      count == 1 ? '1 document' : '$count documents';
+
+  @override
+  String joinOverwriteBody(String name) =>
+      '$name already exists in Download/Dropify. Overwrite?';
+
+  @override
+  String joinSucceeded(String name) => 'Joined: $name';
+
+  @override
+  String joinFailedDetail(String error) => 'Could not join: $error';
+
+  @override
+  String get sessionExpired => 'Your session expired. Sign in again.';
+
+  @override
+  String connectionFailed(String detail) =>
+      'Could not reach Pixeldrain: $detail';
+
+  @override
+  String loginFailedHttp(int code) => 'Sign-in failed (HTTP $code). Try again.';
+
+  @override
+  String get downloadFailed => 'Download failed.';
+
+  @override
+  String get fileNotFoundOnPixeldrain => 'File not found on Pixeldrain.';
+
+  @override
+  String get downloadBlocked =>
+      'The server refused (HTTP 403) — usually the Pixeldrain download limit '
+      'has been reached or the file is restricted. Try again later / open in '
+      'your browser.';
+
+  @override
+  String get downloadDenied => 'File access denied (HTTP 401).';
+
+  @override
+  String get serverRateLimited =>
+      'The server is still rate limiting. Try again later.';
+
+  @override
+  String serverError(int code) => 'Download server error (HTTP $code).';
+
+  @override
+  String get connectionTimeout => 'Connection timed out. Try again.';
+
+  @override
+  String get noInternet => 'No internet connection.';
+
+  @override
+  String get fileAccessRequired => 'File access permission required';
+
+  @override
+  String get transferRunning => 'Transferring';
+
+  @override
+  String get browser => 'Browser';
+
+  @override
+  String get probeUnreachable => 'unreachable';
+
+  @override
+  String get probeFailed => 'failed';
+
+  @override
+  String get connectionDropped => 'connection dropped before finishing';
+
+  @override
+  String sizeMismatch(int received, int expected) =>
+      'file size mismatch ($received/$expected bytes)';
+
+  @override
+  String get chunkIncomplete => 'chunk did not finish';
+
+  @override
+  String get invalidRange => 'invalid range';
+
+  @override
+  String get downloaderNotResponding => 'The downloader is not responding.';
+
+  @override
+  String get downloadStartFailed => 'Could not start the download.';
+
+  @override
+  String get downloaderUnavailable =>
+      'The Android downloader is not available on this device.';
 }

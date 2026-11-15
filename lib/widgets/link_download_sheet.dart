@@ -105,7 +105,7 @@ class _LinkSheetState extends State<_LinkSheet> {
       if (task != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${s.download} ${task.name}'),
+            content: Text(s.downloadStartedSnack(task.name)),
             action: SnackBarAction(
               label: s.downloads,
               onPressed: () => showTransfers(context, widget.ctrl),

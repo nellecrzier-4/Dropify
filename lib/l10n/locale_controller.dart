@@ -30,6 +30,13 @@ class LocaleController extends ChangeNotifier with WidgetsBindingObserver {
   AppStrings get strings =>
       locale.languageCode == 'id' ? const StringsId() : const StringsEn();
 
+  /// Bahasa perangkat, terlepas dari pilihan pengguna — dipakai sebagai
+  /// keterangan di opsi "Ikuti sistem".
+  AppStrings get deviceStrings =>
+      _deviceLocale.languageCode == 'id' ? const StringsId() : const StringsEn();
+
+  String get deviceLanguageName => deviceStrings.languageName;
+
   Future<void> load() async {
     _deviceLocale = PlatformDispatcher.instance.locale;
     final prefs = await SharedPreferences.getInstance();
