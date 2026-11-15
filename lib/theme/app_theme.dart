@@ -66,7 +66,8 @@ class AppColors {
   static Color documents = const Color(0xFF7A5C1E);
   static Color other = const Color(0xFF5D5B66);
 
-  static const Color defaultSeed = Color(0xFF6750A4);
+  // Tanpa warna sistem, tema utama Dropify memakai biru.
+  static const Color defaultSeed = Color(0xFF0A84FF);
 
   static Color get seed => _seed;
   static Color _seed = defaultSeed;

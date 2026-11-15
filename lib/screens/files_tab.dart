@@ -7,14 +7,39 @@ import '../models/pd_item.dart';
 import '../services/pixeldrain_api.dart';
 import '../theme/app_theme.dart';
 import '../widgets/file_tile.dart';
+import '../controllers/gofile_controller.dart';
+import '../services/download_service.dart';
+import '../services/gofile_api.dart';
+import '../utils/file_types.dart';
+import 'gofile_screen.dart';
 import '../widgets/kit.dart';
 import '../widgets/motion.dart';
 import 'file_list_screen.dart';
 
 /// Tab Files: browse folder & file di filesystem Pixeldrain.
-class FilesTab extends StatelessWidget {
+class FilesTab extends StatefulWidget {
   final DriveController ctrl;
   const FilesTab({super.key, required this.ctrl});
+
+  @override
+  State<FilesTab> createState() => _FilesTabState();
+}
+
+class _FilesTabState extends State<FilesTab> {
+  final GofileController _gofile = GofileController();
+  bool _gofileMode = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _gofile.load();
+  }
+
+  @override
+  void dispose() {
+    _gofile.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -39,8 +64,35 @@ class FilesTab extends StatelessWidget {
               ),
             ),
           ),
+          // Sumber file: upload Pixeldrain atau akun Gofile.
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+            child: Row(
+              children: [
+                SoftChip(
+                  icon: Icons.cloud_rounded,
+                  label: 'Pixeldrain Uploads',
+                  selected: !_gofileMode,
+                  onTap: () => setState(() => _gofileMode = false),
+                ),
+                const SizedBox(width: 8),
+                SoftChip(
+                  icon: Icons.folder_shared_rounded,
+                  label: 'Gofile',
+                  selected: _gofileMode,
+                  onTap: () => setState(() => _gofileMode = true),
+                ),
+              ],
+            ),
+          ),
           Expanded(
-            child: FolderView(ctrl: ctrl, segments: const [], root: true),
+            child: _gofileMode
+                ? _GofileBrowser(ctrl: _gofile)
+                : FolderView(
+                    ctrl: widget.ctrl,
+                    segments: const [],
+                    root: true,
+                  ),
           ),
         ],
       ),
@@ -48,51 +100,217 @@ class FilesTab extends StatelessWidget {
   }
 }
 
-class FolderScreen extends StatelessWidget {
-  final DriveController ctrl;
-  final List<String> segments;
-  const FolderScreen({super.key, required this.ctrl, required this.segments});
+/// Daftar isi akun Gofile (root), folder bisa dibuka.
+class _GofileBrowser extends StatefulWidget {
+  const _GofileBrowser({required this.ctrl});
+
+  final GofileController ctrl;
+
+  @override
+  State<_GofileBrowser> createState() => _GofileBrowserState();
+}
+
+class _GofileBrowserState extends State<_GofileBrowser> {
+  late final DownloadService _downloads = DownloadService(PixeldrainApi());
+
+  @override
+  void dispose() {
+    _downloads.dispose();
+    super.dispose();
+  }
+
+  Future<void> _download(GofileEntry entry) async {
+    final link = entry.link;
+    if (link == null || link.isEmpty) return;
+    final task = await _downloads.download(
+      PdItem(name: entry.name, size: entry.size, mime: ''),
+      urlOverride: link,
+    );
+    if (!mounted) return;
+    showAppSnack(
+      context,
+      task?.status == DownloadStatus.error
+          ? context.s.downloadFailedSnack(entry.name, task?.error ?? '')
+          : context.s.downloadingSnack(entry.name),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: AuroraBackground(
-        child: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    final s = context.s;
+    final scheme = AppColors.scheme;
+
+    return ListenableBuilder(
+      listenable: widget.ctrl,
+      builder: (context, _) {
+        final ctrl = widget.ctrl;
+        if (!ctrl.loggedIn) {
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
             children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 8, 18, 6),
+              Surface(
+                padding: const EdgeInsets.all(20),
+                onTap: () => Navigator.of(context).push(
+                  SharedAxisPageRoute<void>(
+                    builder: (_) => const GofileScreen(),
+                  ),
+                ),
                 child: Row(
                   children: [
-                    IconButton.filledTonal(
-                      onPressed: () => Navigator.maybePop(context),
-                      icon: const Icon(Icons.arrow_back_rounded, size: 20),
-                      tooltip: MaterialLocalizations.of(context)
-                          .backButtonTooltip,
+                    GlowIcon(
+                      icon: Icons.folder_shared_rounded,
+                      size: 46,
+                      color: scheme.primary,
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 14),
                     Expanded(
-                      child: Text(
-                        segments.isEmpty ? context.s.files : segments.last,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: -0.3,
-                          color: AppColors.text,
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Gofile',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            s.gofileIntro,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: scheme.onSurfaceVariant,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
+                    Icon(Icons.chevron_right_rounded,
+                        color: scheme.onSurfaceVariant),
                   ],
                 ),
               ),
-              Expanded(child: FolderView(ctrl: ctrl, segments: segments)),
+            ],
+          );
+        }
+
+        if (ctrl.loading) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final entries = ctrl.entries;
+        return RefreshIndicator(
+          onRefresh: ctrl.refresh,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 140),
+            children: [
+              if (ctrl.error != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Text(
+                    ctrl.error == 'error-notPremium'
+                        ? s.gofilePremiumNeeded
+                        : s.downloadFailedSnack('Gofile', ctrl.error!),
+                    style: TextStyle(color: scheme.error, fontSize: 12.5),
+                  ),
+                ),
+              if (entries.isEmpty)
+                DashedPanel(
+                  padding: const EdgeInsets.symmetric(vertical: 26),
+                  child: Column(
+                    children: [
+                      const OrbIcon(icon: Icons.cloud_off_rounded, size: 84),
+                      const SizedBox(height: 10),
+                      Text(
+                        s.gofileEmpty,
+                        style: TextStyle(
+                          color: scheme.onSurfaceVariant,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                for (var i = 0; i < entries.length; i++)
+                  Stagger(
+                    index: i,
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Surface(
+                        radius: AppRadii.lg,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
+                        ),
+                        onTap: entries[i].isDir
+                            ? () => Navigator.of(context).push(
+                                  SharedAxisPageRoute<void>(
+                                    builder: (_) => GofileScreen(
+                                      controller: ctrl,
+                                      folderId: entries[i].id,
+                                      title: entries[i].name,
+                                    ),
+                                  ),
+                                )
+                            : () => _download(entries[i]),
+                        child: Row(
+                          children: [
+                            GlowIcon(
+                              icon: entries[i].isDir
+                                  ? Icons.folder_rounded
+                                  : Icons.insert_drive_file_rounded,
+                              size: 44,
+                              color: entries[i].isDir
+                                  ? scheme.primary
+                                  : AppColors.other,
+                            ),
+                            const SizedBox(width: 13),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    entries[i].name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: scheme.onSurface,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    entries[i].isDir
+                                        ? 'Folder'
+                                        : formatSize(entries[i].size),
+                                    style: TextStyle(
+                                      color: scheme.onSurfaceVariant,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Icon(
+                              entries[i].isDir
+                                  ? Icons.chevron_right_rounded
+                                  : Icons.download_rounded,
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
             ],
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -720,6 +938,55 @@ class _SheetRow extends StatelessWidget {
             Icon(Icons.chevron_right_rounded,
                 color: AppColors.scheme.onSurfaceVariant, size: 20),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class FolderScreen extends StatelessWidget {
+  final DriveController ctrl;
+  final List<String> segments;
+  const FolderScreen({super.key, required this.ctrl, required this.segments});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: AuroraBackground(
+        child: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 18, 6),
+                child: Row(
+                  children: [
+                    IconButton.filledTonal(
+                      onPressed: () => Navigator.maybePop(context),
+                      icon: const Icon(Icons.arrow_back_rounded, size: 20),
+                      tooltip: MaterialLocalizations.of(context)
+                          .backButtonTooltip,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        segments.isEmpty ? context.s.files : segments.last,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.3,
+                          color: AppColors.text,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(child: FolderView(ctrl: ctrl, segments: segments)),
+            ],
+          ),
         ),
       ),
     );

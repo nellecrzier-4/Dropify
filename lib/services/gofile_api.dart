@@ -92,7 +92,13 @@ class GofileApi {
     try {
       res = await _dio.get<Map<String, dynamic>>(
         '/contents/$folderId',
-        queryParameters: {'token': token, 'pageSize': 1000},
+        queryParameters: {
+          'token': token,
+          'contentFilter': 'all',
+          'sortField': 'createTime',
+          'sortDirection': -1,
+          'pageSize': 1000,
+        },
       );
     } on DioException catch (e) {
       throw GofileException(

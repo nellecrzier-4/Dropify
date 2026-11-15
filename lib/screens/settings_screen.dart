@@ -36,10 +36,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _toggleDynamic(bool value) async {
+    // Cukup diterapkan langsung: warna diambil ulang dan MaterialApp rebuild.
     await ThemeController.instance.setDynamic(value);
-    if (value) return; // menyalakan cukup langsung diterapkan
-    // Mematikan: warnanya perlu dimuat ulang dari awal -> restart aplikasi.
-    NativeDownloads.restartApp();
   }
 
   @override
