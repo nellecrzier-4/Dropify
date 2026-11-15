@@ -122,15 +122,20 @@ class GofileApi {
       );
     }
     final data = _data(res);
-    final children = data['children'];
+    // `children` bisa berupa map (id -> entry) atau list, tergantung versi API.
+    final children = data['children'] ?? data['files'] ?? data['contents'];
     final entries = <GofileEntry>[];
+    final raw = <dynamic>[];
     if (children is Map) {
-      for (final value in children.values) {
-        if (value is Map<String, dynamic>) {
-          entries.add(GofileEntry.fromJson(value));
-        } else if (value is Map) {
-          entries.add(GofileEntry.fromJson(Map<String, dynamic>.from(value)));
-        }
+      raw.addAll(children.values);
+    } else if (children is List) {
+      raw.addAll(children);
+    }
+    for (final value in raw) {
+      if (value is Map<String, dynamic>) {
+        entries.add(GofileEntry.fromJson(value));
+      } else if (value is Map) {
+        entries.add(GofileEntry.fromJson(Map<String, dynamic>.from(value)));
       }
     }
     entries.sort((a, b) {

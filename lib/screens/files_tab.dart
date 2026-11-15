@@ -236,7 +236,7 @@ class _GofileBrowserState extends State<_GofileBrowser> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(0, 4, 0, 140),
             children: [
-              _linkBar(context, ctrl),
+              if (!ctrl.loggedIn || entries.isEmpty) _linkBar(context, ctrl),
               if (title != null)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(22, 4, 22, 8),
