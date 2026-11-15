@@ -7,6 +7,7 @@ import '../theme/app_theme.dart';
 import '../utils/file_types.dart';
 import '../widgets/file_tile.dart';
 import '../widgets/kit.dart';
+import '../widgets/skeleton.dart';
 import '../widgets/motion.dart';
 import '../widgets/storage_card.dart';
 import '../widgets/sync_card.dart';
@@ -81,6 +82,9 @@ class HomeTab extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 14),
+                if (!ctrl.loaded && ctrl.loading)
+                  const HomeSkeleton()
+                else ...[
                 stagger(SyncCard(ctrl: ctrl, onLogout: onLogout)),
                 stagger(SectionLabel(s.storage)),
                 stagger(
@@ -107,6 +111,7 @@ class HomeTab extends StatelessWidget {
                       padding: const EdgeInsets.only(bottom: 8),
                       child: FileTile(ctrl: ctrl, item: f, index: step++),
                     ),
+                ],
                 ],
               ],
             ),
