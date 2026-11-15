@@ -34,14 +34,14 @@ class GofileApi {
     }
   }
 
-  /// Ambil info akun dari token. Endpoint Gofile butuh account id di path,
-  /// jadi id diambil dari klaim di dalam token (JWT) kalau ada.
+  /// Ambil info akun dari token (32 karakter, dari tautan login email).
+  ///
+  /// Endpoint web Gofile: `GET /accounts/website` dengan Authorization Bearer.
+  /// Ini yang dipakai halaman login mereka — tidak perlu account id di path.
   Future<GofileAccount> account(String token, {String? accountId}) async {
-    final id = accountId ?? accountIdFromToken(token);
-    if (id == null) throw GofileException('butuh_api_token');
     try {
       final res = await _dio.get<Map<String, dynamic>>(
-        '/accounts/$id',
+        '/accounts/website',
         options: Options(headers: _auth(token)),
       );
       final data = _data(res);

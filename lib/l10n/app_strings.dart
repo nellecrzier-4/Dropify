@@ -1000,8 +1000,8 @@ class StringsId extends AppStrings {
 
   @override
   String get gofileIntro =>
-      'Masukkan email akun Gofile. Kami kirim tautan masuk ke email itu; tempel '
-      'tautannya di sini untuk menyambungkan akun.';
+      'Masukkan email akun Gofile. Kami kirim tautan masuk ke email itu — tempel '
+      'tautannya (atau token 32 karakternya) di kolom kedua.';
 
   @override
   String get gofileEmailHint => 'Email akun Gofile';
@@ -1026,8 +1026,8 @@ class StringsId extends AppStrings {
 
   @override
   String get gofileTokenNeeded =>
-      'Tautan login dari email tidak bisa dipakai langsung oleh aplikasi. '
-      'Buka gofile.io → Profile → API token, lalu tempel token itu di sini.';
+      'Tempel tautan login dari email (atau 32 karakter tokennya). '
+      'Kalau tautannya kedaluwarsa, kirim ulang lalu salin yang terbaru.';
 
   @override
   String get gofilePremiumNeeded =>
@@ -1769,8 +1769,8 @@ class StringsEn extends AppStrings {
 
   @override
   String get gofileIntro =>
-      'Enter your Gofile account email. We send a sign-in link to it; paste '
-      'that link here to connect the account.';
+      'Enter your Gofile account email. We send a sign-in link to it — paste '
+      'that link (or its 32-character token) in the second field.';
 
   @override
   String get gofileEmailHint => 'Gofile account email';
@@ -1795,8 +1795,8 @@ class StringsEn extends AppStrings {
 
   @override
   String get gofileTokenNeeded =>
-      'The sign-in link from the email cannot be used by the app directly. '
-      'Open gofile.io → Profile → API token, then paste that token here.';
+      'Paste the sign-in link from the email (or its 32-character token). '
+      'If the link expired, send a new one and copy the latest.';
 
   @override
   String get gofilePremiumNeeded =>
