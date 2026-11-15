@@ -102,12 +102,23 @@ Future<void> downloadItem(
       label: forbidden && fileId.isNotEmpty ? 'Verifikasi' : s.downloads,
       onPressed: () async {
         if (forbidden && fileId.isNotEmpty) {
-          final ok = await Navigator.of(context).push<bool>(
-            MaterialPageRoute<bool>(
+          final result = await Navigator.of(context).push<PdCaptchaResult>(
+            MaterialPageRoute<PdCaptchaResult>(
               builder: (_) => PdCaptchaScreen(fileId: fileId),
             ),
           );
-          if (ok == true) await ctrl.downloads.retry(task.id);
+          if (result?.url != null) {
+            // Halaman memberi tautan bertoken setelah captcha: pakai apa adanya.
+            await ctrl.downloads.download(
+              item,
+              urlOverride: result!.url,
+              headers: result.cookie == null
+                  ? const {}
+                  : {'Cookie': result.cookie!},
+            );
+          } else if (result != null) {
+            await ctrl.downloads.retry(task.id);
+          }
         } else {
           showTransfers(context, ctrl);
         }

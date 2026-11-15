@@ -401,12 +401,23 @@ class _DownloadsTab extends StatelessWidget {
                             ? task.item.id!
                             : (fileIdFromUrl(task.url ?? task.directUrl) ?? '');
                         if (id.isEmpty) return;
-                        final ok = await Navigator.of(context).push<bool>(
-                          MaterialPageRoute<bool>(
+                        final result =
+                            await Navigator.of(context).push<PdCaptchaResult>(
+                          MaterialPageRoute<PdCaptchaResult>(
                             builder: (_) => PdCaptchaScreen(fileId: id),
                           ),
                         );
-                        if (ok == true) controller.downloads.retry(task.id);
+                        if (result?.url != null) {
+                          await controller.downloads.download(
+                            task.item,
+                            urlOverride: result!.url,
+                            headers: result.cookie == null
+                                ? const {}
+                                : {'Cookie': result.cookie!},
+                          );
+                        } else if (result != null) {
+                          controller.downloads.retry(task.id);
+                        }
                       },
                     ),
                   if (task.url != null)
