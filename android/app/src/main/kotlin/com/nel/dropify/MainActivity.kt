@@ -37,6 +37,9 @@ class MainActivity : FlutterActivity() {
     private var pendingPermission: MethodChannel.Result? = null
     private var pendingPicker: MethodChannel.Result? = null
 
+    /// Descriptor yang harus tetap hidup selama unggahan berjalan.
+    private val openFds = mutableListOf<android.os.ParcelFileDescriptor>()
+
     companion object {
         private const val REQUEST_PERMISSIONS = 4711
         private const val REQUEST_PICK_FILES = 4712
@@ -83,8 +86,10 @@ class MainActivity : FlutterActivity() {
         val name = displayName(uri) ?: "unggahan"
         val size = sizeOf(uri)
 
-        val path = realPath(uri)
-        if (path != null) {
+        // Urutan dari yang paling murah: dokumen id, kolom MediaStore, lalu
+        // file descriptor (/proc/self/fd/N). Salinan cache hanya upaya terakhir.
+        val path = pathFromDocumentId(uri) ?: realPath(uri) ?: fdPath(uri)
+        if (path != null && File(path).exists()) {
             result.success(mapOf("path" to path, "name" to name, "size" to size))
             return
         }
@@ -119,6 +124,56 @@ class MainActivity : FlutterActivity() {
             ?.use { cursor -> if (cursor.moveToFirst()) cursor.getLong(0) else 0L } ?: 0L
     } catch (e: Exception) {
         0L
+    }
+
+    /**
+     * Path dari document id SAF tanpa query mahal:
+     * `primary:Download/x.zip` (ExternalStorage) dan `raw:/storage/...`
+     * (Downloads) memakai format yang tetap.
+     */
+    private fun pathFromDocumentId(uri: Uri): String? {
+        val docId = try {
+            android.provider.DocumentsContract.getDocumentId(uri)
+        } catch (e: Exception) {
+            null
+        } ?: return null
+
+        if (docId.startsWith("raw:")) {
+            val raw = docId.removePrefix("raw:")
+            return if (File(raw).exists()) raw else null
+        }
+        if (docId.contains(":")) {
+            val parts = docId.split(":", limit = 2)
+            val volume = parts[0]
+            val rel = parts[1]
+            val base = if (volume.equals("primary", ignoreCase = true)) {
+                Environment.getExternalStorageDirectory().absolutePath
+            } else {
+                "/storage/$volume"
+            }
+            val candidate = "$base/$rel"
+            if (File(candidate).exists()) return candidate
+        }
+        return null
+    }
+
+    /**
+     * Descriptor berkas tetap terbuka lalu dipakai lewat /proc/self/fd/N.
+     * Dengan begitu provider yang tidak punya path tetap bisa diunggah tanpa
+     * menyalin isi berkas.
+     */
+    private fun fdPath(uri: Uri): String? {
+        return try {
+            val pfd = contentResolver.openFileDescriptor(uri, "r")
+            if (pfd == null) {
+                null
+            } else {
+                openFds.add(pfd)
+                "/proc/self/fd/${pfd.fd}"
+            }
+        } catch (e: Exception) {
+            null
+        }
     }
 
     /** Path nyata dari MediaStore/Downloads; null kalau provider tidak memberi path. */
