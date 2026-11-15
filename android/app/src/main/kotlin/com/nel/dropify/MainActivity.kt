@@ -69,6 +69,84 @@ class MainActivity : FlutterActivity() {
         pendingPicker = null
     }
 
+    /**
+     * Ubah `content://` URI hasil pemilih menjadi path berkas nyata supaya
+     * Dart bisa mengunggahnya tanpa menyalin isi berkas. Kalau path tidak bisa
+     * ditemukan (provider aneh), berkas disalin ke cache sebagai upaya terakhir.
+     */
+    private fun resolveDocument(uriString: String?, result: MethodChannel.Result) {
+        if (uriString.isNullOrBlank()) {
+            result.error("bad_args", "URI kosong", null)
+            return
+        }
+        val uri = Uri.parse(uriString)
+        val name = displayName(uri) ?: "unggahan"
+        val size = sizeOf(uri)
+
+        val path = realPath(uri)
+        if (path != null) {
+            result.success(mapOf("path" to path, "name" to name, "size" to size))
+            return
+        }
+
+        Thread {
+            val copied = try {
+                copyToCache(uri, name)
+            } catch (e: Exception) {
+                null
+            }
+            runOnUiThread {
+                if (copied == null) {
+                    result.error("unreadable", "Berkas tidak bisa dibaca", null)
+                } else {
+                    result.success(
+                        mapOf("path" to copied, "name" to name, "size" to size)
+                    )
+                }
+            }
+        }.start()
+    }
+
+    private fun displayName(uri: Uri): String? = try {
+        contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)
+            ?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
+    } catch (e: Exception) {
+        null
+    }
+
+    private fun sizeOf(uri: Uri): Long = try {
+        contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.SIZE), null, null, null)
+            ?.use { cursor -> if (cursor.moveToFirst()) cursor.getLong(0) else 0L } ?: 0L
+    } catch (e: Exception) {
+        0L
+    }
+
+    /** Path nyata dari MediaStore/Downloads; null kalau provider tidak memberi path. */
+    private fun realPath(uri: Uri): String? {
+        if (uri.scheme == "file") return uri.path
+        try {
+            contentResolver.query(uri, arrayOf(MediaStore.MediaColumns.DATA), null, null, null)
+                ?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val path = cursor.getString(0)
+                        if (!path.isNullOrBlank() && File(path).exists()) return path
+                    }
+                }
+        } catch (e: Exception) {
+            // Kolom DATA tidak selalu tersedia; lanjut ke salinan cache.
+        }
+        return null
+    }
+
+    private fun copyToCache(uri: Uri, name: String): String? {
+        val dir = File(cacheDir, "uploads").apply { mkdirs() }
+        val target = File(dir, sanitize(name))
+        contentResolver.openInputStream(uri)?.use { input ->
+            target.outputStream().use { output -> input.copyTo(output, 256 * 1024) }
+        } ?: return null
+        return target.absolutePath
+    }
+
     private fun pickFiles(multiple: Boolean, result: MethodChannel.Result) {
         if (pendingPicker != null) {
             result.error("busy", "Pemilih berkas masih terbuka", null)
@@ -185,6 +263,10 @@ class MainActivity : FlutterActivity() {
                             }
                             result.success(true)
                         }
+                        "resolveDocument" -> resolveDocument(
+                            call.argument<String>("uri"),
+                            result,
+                        )
                         "pickFiles" -> pickFiles(
                             call.argument<Boolean>("multiple") ?: false,
                             result,

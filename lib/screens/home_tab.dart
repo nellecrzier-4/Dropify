@@ -11,6 +11,7 @@ import '../widgets/kit.dart';
 import '../widgets/motion.dart';
 import '../widgets/storage_card.dart';
 import '../widgets/sync_card.dart';
+import '../services/gofile_upload_service.dart';
 import '../widgets/transfers_sheet.dart';
 import '../widgets/wave_progress.dart';
 import 'file_list_screen.dart';
@@ -78,6 +79,21 @@ class HomeTab extends StatelessWidget {
                         : Padding(
                             padding: const EdgeInsets.only(top: 14),
                             child: _ActiveDownloadsCard(ctrl: ctrl),
+                          ),
+                  ),
+                ),
+                // Unggahan Gofile yang dijalankan aplikasi (bukan WebView).
+                ListenableBuilder(
+                  listenable: GofileUploadService.instance,
+                  builder: (context, _) => AnimatedSize(
+                    duration: Motion.base,
+                    curve: Motion.emphasized,
+                    alignment: Alignment.topCenter,
+                    child: !GofileUploadService.instance.hasActive
+                        ? const SizedBox(width: double.infinity)
+                        : Padding(
+                            padding: const EdgeInsets.only(top: 14),
+                            child: const _ActiveUploadsCard(),
                           ),
                   ),
                 ),
@@ -394,6 +410,91 @@ class _TransferPill extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Progres unggahan Gofile (dijalankan GofileUploadService di latar belakang).
+class _ActiveUploadsCard extends StatelessWidget {
+  const _ActiveUploadsCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final service = GofileUploadService.instance;
+    final active = service.tasks.where((t) => t.isActive).toList();
+    if (active.isEmpty) return const SizedBox.shrink();
+
+    final progress = active
+            .map((t) => t.progress)
+            .fold<double>(0, (a, b) => a + b) /
+        active.length;
+    final scheme = AppColors.scheme;
+    final first = active.first;
+
+    return Surface(
+      radius: AppRadii.xl,
+      color: scheme.surfaceContainerHigh,
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              GlowIcon(
+                icon: Icons.cloud_upload_rounded,
+                size: 40,
+                color: scheme.primary,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  active.length == 1
+                      ? first.name
+                      : context.s.uploadsActive(active.length),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.text,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '${(progress * 100).round()}%',
+                style: TextStyle(
+                  color: scheme.primary,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(99),
+            child: LinearProgressIndicator(
+              value: progress.clamp(0.0, 1.0),
+              minHeight: 6,
+              backgroundColor: scheme.surfaceContainerHighest,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            active.length == 1
+                ? '${formatSize(first.sent)} / ${formatSize(first.size)}'
+                    '${first.speed > 0 ? ' · ${formatSize(first.speed.round())}/s' : ''}'
+                : context.s.gofileUploadBackground,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: scheme.onSurfaceVariant,
+              fontSize: 11.5,
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -12,7 +12,6 @@ import '../widgets/file_tile.dart';
 import '../controllers/gofile_controller.dart';
 import '../services/download_service.dart';
 import '../services/gofile_api.dart';
-import '../services/gofile_start.dart';
 import '../utils/file_types.dart';
 import 'gofile_screen.dart';
 import 'gofile_web_screen.dart';
@@ -43,6 +42,19 @@ class _FilesTabState extends State<FilesTab> {
   void dispose() {
     _gofile.dispose();
     super.dispose();
+  }
+
+  /// Buka halaman Gofile di dalam app (sesi akun dari WebView dipertahankan).
+  void _openWeb(BuildContext context, [String? url]) {
+    Navigator.of(context).push(
+      SharedAxisPageRoute<void>(
+        builder: (_) => GofileWebScreen(
+          url: url,
+          token: _gofile.token,
+          ctrl: _gofile,
+        ),
+      ),
+    );
   }
 
   @override
@@ -83,8 +95,10 @@ class _FilesTabState extends State<FilesTab> {
                 SoftChip(
                   icon: Icons.folder_shared_rounded,
                   label: 'Gofile',
-                  selected: _gofileMode,
-                  onTap: () => setState(() => _gofileMode = true),
+                  selected: false,
+                  // Sesuai permintaan: menekan Gofile langsung membuka WebView
+                  // di beranda gofile.io, memakai sesi akun yang sudah masuk.
+                  onTap: () => _openWeb(context, 'https://gofile.io/'),
                 ),
               ],
             ),
@@ -118,27 +132,6 @@ class _GofileBrowserState extends State<_GofileBrowser> {
   late final DownloadService _downloads = DownloadService(PixeldrainApi());
   final _link = TextEditingController();
 
-  /// Folder utama Gofile yang tersimpan, ditampilkan di kolom tautan supaya
-  /// tidak perlu diketik ulang.
-  String? _savedStart;
-
-  @override
-  void initState() {
-    super.initState();
-    unawaited(_loadSavedStart());
-  }
-
-  Future<void> _loadSavedStart() async {
-    final url = await GofileStart.load(widget.ctrl.token);
-    if (!mounted) return;
-    setState(() {
-      _savedStart = url;
-      if (url != null && _link.text.trim().isEmpty) {
-        _link.text = GofileStart.shortLink(url);
-      }
-    });
-  }
-
   @override
   void dispose() {
     _downloads.dispose();
@@ -149,27 +142,25 @@ class _GofileBrowserState extends State<_GofileBrowser> {
   void _openWeb(BuildContext context, [String? url]) {
     Navigator.of(context).push(
       SharedAxisPageRoute<void>(
-        builder: (_) => GofileWebScreen(url: url, token: widget.ctrl.token),
+        builder: (_) => GofileWebScreen(
+          url: url,
+          token: widget.ctrl.token,
+          ctrl: widget.ctrl,
+        ),
       ),
     );
   }
 
-  /// Buka tautan di kolom: kalau isinya folder Gofile, simpan sebagai folder
-  /// utama supaya lain kali langsung ke sana.
-  Future<void> _openFromField(BuildContext context) async {
+  /// Buka tautan di kolom sebagai halaman Gofile di dalam app.
+  void _openFromField(BuildContext context) {
     final text = _link.text.trim();
     if (text.isEmpty) {
-      _openWeb(context, _savedStart);
+      _openWeb(context);
       return;
     }
-    final url = GofileStart.normaliseInput(text) ??
-        (text.startsWith('http') ? text : 'https://gofile.io/d/$text');
-    if (GofileStart.isFolderPage(url)) {
-      await GofileStart.save(widget.ctrl.token, url);
-      if (!mounted) return;
-      setState(() => _savedStart = url);
-    }
-    if (!context.mounted) return;
+    final url = text.startsWith('http')
+        ? text
+        : 'https://gofile.io/d/$text';
     _openWeb(context, url);
   }
 

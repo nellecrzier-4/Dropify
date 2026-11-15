@@ -7,10 +7,12 @@ import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 
+import '../controllers/gofile_controller.dart';
 import '../l10n/locale_controller.dart';
 import '../models/pd_item.dart';
 import '../services/download_service.dart';
-import '../services/gofile_start.dart';
+import '../services/gofile_api.dart';
+import '../services/gofile_upload_service.dart';
 import '../services/native_downloads.dart';
 import '../services/pixeldrain_api.dart';
 import '../services/web_download_links.dart';
@@ -34,9 +36,13 @@ import '../widgets/kit.dart';
 /// Unggah lewat tombol "Select files" di halaman Gofile memakai pemilih berkas
 /// Android aplikasi ([FilePicker]); tanpa ini WebView tidak membuka apa pun.
 class GofileWebScreen extends StatefulWidget {
-  const GofileWebScreen({super.key, this.url, this.token});
+  const GofileWebScreen({super.key, this.url, this.token, this.ctrl});
 
   final String? url;
+
+  /// Controller akun Gofile; dipakai untuk token + folder akar saat mengunggah
+  /// dari halaman (unggahan dijalankan aplikasi, bukan WebView).
+  final GofileController? ctrl;
 
   /// Token akun Gofile dari app; dipakai untuk login di web supaya sesi yang
   /// terbuka adalah akun pengguna, bukan akun guest.
@@ -66,15 +72,24 @@ class _GofileWebScreenState extends State<GofileWebScreen> {
     return shared ?? (_ownDownloads ??= DownloadService(PixeldrainApi()));
   }
 
-  /// Halaman awal Gofile yang tersimpan ("folder utama") untuk akun ini.
-  String? _pinnedUrl;
+  /// Token akun Gofile yang tersedia di aplikasi (untuk unggah latar).
+  String? get _token {
+    final direct = widget.token?.trim() ?? '';
+    if (direct.isNotEmpty) return direct;
+    final fromCtrl = widget.ctrl?.token?.trim() ?? '';
+    return fromCtrl.isEmpty ? null : fromCtrl;
+  }
 
-  /// URL halaman yang sedang tampil.
-  String? _currentUrl;
-
-  String get _loginUrl => widget.token != null && widget.token!.isNotEmpty
-      ? 'https://gofile.io/login/${widget.token}'
-      : 'https://gofile.io/';
+  /// Langsung ke beranda Gofile; kalau ada token, tautan login resmi dipakai
+  /// supaya sesi yang terbuka adalah akun pengguna (bukan guest).
+  String get _startUrl {
+    final wanted = widget.url?.trim();
+    if (wanted != null && wanted.isNotEmpty) return wanted;
+    final token = _token;
+    return token != null
+        ? 'https://gofile.io/login/$token'
+        : 'https://gofile.io/';
+  }
 
   @override
   void initState() {
@@ -85,35 +100,13 @@ class _GofileWebScreenState extends State<GofileWebScreen> {
       ..addJavaScriptChannel(_jsChannel, onMessageReceived: _onJsMessage)
       ..setNavigationDelegate(
         NavigationDelegate(
-          onUrlChange: (change) => _currentUrl = change.url,
           onPageFinished: (url) => _onPageFinished(url),
           onNavigationRequest: _onNavigationRequest,
         ),
-      );
+      )
+      ..loadRequest(Uri.parse(_startUrl));
 
     _attachFileChooser();
-    unawaited(_openFirstPage());
-  }
-
-  /// Buka tautan yang diminta layar sebelumnya, lalu folder utama yang
-  /// tersimpan, baru beranda/login. Tautan yang diketik pengguna selalu
-  /// disimpan sebagai folder utama, jadi tidak perlu diulang lain kali.
-  Future<void> _openFirstPage() async {
-    _pinnedUrl = await GofileStart.load(widget.token);
-    final wanted = widget.url?.trim();
-    var target = _loginUrl;
-    if (wanted != null && wanted.isNotEmpty) {
-      target = wanted;
-      if (GofileStart.isFolderPage(wanted)) {
-        await GofileStart.save(widget.token, wanted);
-        _pinnedUrl = wanted;
-      }
-    } else if (_pinnedUrl != null) {
-      target = _pinnedUrl!;
-    }
-    if (!mounted) return;
-    await _web.loadRequest(Uri.parse(target));
-    if (mounted && _pinnedUrl != null) setState(() {});
   }
 
   /// Sambungkan pemilih berkas WebView ke pemilih berkas aplikasi, supaya
@@ -128,26 +121,93 @@ class _GofileWebScreenState extends State<GofileWebScreen> {
   Future<List<String>> _onShowFileSelector(FileSelectorParams params) async {
     final multiple = params.mode == FileSelectorMode.openMultiple;
 
-    // Jalur utama: pemilih native mengembalikan content:// URI apa adanya,
-    // jadi berkas besar tidak disalin dulu ke cache (file_picker menyalin
-    // seluruh isi berkas sebelum WebView bisa mengunggahnya).
-    final native = await NativeDownloads.pickDocuments(multiple: multiple);
-    if (native != null) return native;
+    // Pemilih native mengembalikan content:// URI apa adanya, jadi berkas besar
+    // tidak disalin dulu ke cache (file_picker menyalin seluruh isi berkas).
+    final picked = await NativeDownloads.pickDocuments(multiple: multiple);
+    if (picked == null) {
+      // Kanál native tidak tersedia: pakai file_picker dan serahkan ke WebView.
+      try {
+        final result = await FilePicker.platform.pickFiles(
+          allowMultiple: multiple,
+          type: FileType.any,
+          withData: false,
+        );
+        if (result == null) return const <String>[];
+        return <String>[
+          for (final file in result.files)
+            if (file.path != null && file.path!.isNotEmpty) file.path!,
+        ];
+      } catch (_) {
+        return const <String>[];
+      }
+    }
+    if (picked.isEmpty) return const <String>[];
 
-    // Cadangan kalau kanal native tidak tersedia.
+    // Unggahan dijalankan aplikasi (bukan WebView) supaya tetap jalan di latar
+    // belakang dan progresnya muncul di Home + notifikasi. Tanpa token akun,
+    // berkas diserahkan ke WebView seperti sebelumnya.
+    final token = await _accountToken();
+    if (token == null) return picked;
+
+    final sources = <NativeUploadSource>[];
+    for (final uri in picked) {
+      final file = await NativeDownloads.resolveDocument(uri);
+      if (file != null) {
+        sources.add(NativeUploadSource(path: file.path, name: file.name));
+      }
+    }
+    if (sources.isEmpty) return const <String>[];
+
+    final folderId = await _rootFolderId(token);
+    unawaited(
+      GofileUploadService.instance.uploadAll(
+        sources: sources,
+        token: token,
+        folderId: folderId,
+      ),
+    );
+
+    if (mounted) {
+      HapticFeedback.selectionClick();
+      showAppSnack(context, context.s.gofileUploadQueued(sources.length));
+    }
+    // Jangan biarkan WebView mengunggah ulang berkasnya.
+    return const <String>[];
+  }
+
+  /// Token akun Gofile: dari layar pemanggil, controller, atau cookie sesi
+  /// WebView (kalau pengguna hanya masuk lewat halaman Gofile).
+  Future<String?> _accountToken() async {
+    final direct = widget.token?.trim() ?? '';
+    if (direct.isNotEmpty) return direct;
+    final fromCtrl = widget.ctrl?.token?.trim() ?? '';
+    if (fromCtrl.isNotEmpty) return fromCtrl;
     try {
-      final result = await FilePicker.platform.pickFiles(
-        allowMultiple: multiple,
-        type: FileType.any,
-        withData: false,
-      );
-      if (result == null) return const <String>[];
-      return <String>[
-        for (final file in result.files)
-          if (file.path != null && file.path!.isNotEmpty) file.path!,
-      ];
+      final cookies = await WebViewCookieManager()
+          .platform
+          .getCookies(Uri.parse('https://gofile.io/'));
+      for (final cookie in cookies) {
+        if (cookie.name == 'accountToken' && cookie.value.trim().isNotEmpty) {
+          return cookie.value.trim();
+        }
+      }
     } catch (_) {
-      return const <String>[];
+      // Cookie tidak terbaca: unggahan tetap bisa lewat WebView.
+    }
+    return null;
+  }
+
+  /// Folder akar akun sebagai tujuan unggahan.
+  Future<String?> _rootFolderId(String token) async {
+    final account = widget.ctrl?.account;
+    if (account != null && account.rootFolder.isNotEmpty) {
+      return account.rootFolder;
+    }
+    try {
+      final info = await GofileApi().account(token);
+      return info.rootFolder.isEmpty ? null : info.rootFolder;
+    } catch (_) {
+      return null;
     }
   }
 
@@ -158,39 +218,8 @@ class _GofileWebScreenState extends State<GofileWebScreen> {
   }
 
   Future<void> _onPageFinished(String url) async {
-    _currentUrl = url;
     await _applyTheme();
     await _installDownloadHooks();
-
-    // Folder pertama yang dibuka otomatis jadi halaman awal, supaya pengguna
-    // tidak perlu menempelkan tautannya lagi.
-    if (_pinnedUrl == null && GofileStart.isFolderPage(url)) {
-      await GofileStart.save(widget.token, url);
-      if (!mounted) return;
-      setState(() => _pinnedUrl = url);
-      showAppSnack(context, context.s.gofileStartSaved);
-    }
-  }
-
-  /// Tombol pin: jadikan halaman sekarang sebagai halaman awal, atau hapus.
-  Future<void> _togglePin() async {
-    final s = context.s;
-    if (_pinnedUrl != null) {
-      await GofileStart.clear(widget.token);
-      if (!mounted) return;
-      setState(() => _pinnedUrl = null);
-      showAppSnack(context, s.gofileStartCleared);
-      return;
-    }
-    final url = _currentUrl;
-    if (url == null || !GofileStart.isFolderPage(url)) {
-      showAppSnack(context, s.gofileStartNeedsFolder);
-      return;
-    }
-    await GofileStart.save(widget.token, url);
-    if (!mounted) return;
-    setState(() => _pinnedUrl = url);
-    showAppSnack(context, s.gofileStartSaved);
   }
 
   /// Selaraskan tampilan Gofile dengan tema aplikasi: warna permukaan, sudut
@@ -373,17 +402,6 @@ class _GofileWebScreenState extends State<GofileWebScreen> {
                     child: Text(
                       'Gofile',
                       style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: _pinnedUrl != null
-                        ? context.s.gofileStartUnpin
-                        : context.s.gofileStartPin,
-                    onPressed: _togglePin,
-                    icon: Icon(
-                      _pinnedUrl != null
-                          ? Icons.push_pin_rounded
-                          : Icons.push_pin_outlined,
                     ),
                   ),
                   IconButton(

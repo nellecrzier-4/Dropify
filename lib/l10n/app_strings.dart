@@ -49,12 +49,13 @@ abstract class AppStrings {
   String get gofileEmpty;
   String get gofileTokenNeeded;
   String get gofilePremiumNeeded;
-  String get gofileStartPin;
-  String get gofileStartUnpin;
-  String get gofileStartSaved;
-  String get gofileStartCleared;
-  String get gofileStartNeedsFolder;
   String get gofileOpenStart;
+  String get gofileUploadBackground;
+  String gofileUploadQueued(int count);
+  String get uploadFailed;
+  String get uploadDenied;
+  String get uploadServerUnavailable;
+  String get gofileUploadHint;
   String get noAccount;
   String get preparingSession;
   String get fillCredentials;
@@ -79,6 +80,7 @@ abstract class AppStrings {
   String get themeDark;
   String get themeAmoled;
   String downloadsActive(int count);
+  String uploadsActive(int count);
   String get savedToFolder;
 
   // Files
@@ -444,6 +446,10 @@ class StringsId extends AppStrings {
   @override
   String downloadsActive(int count) =>
       count == 1 ? 'Mengunduh 1 file' : 'Mengunduh $count file';
+
+  @override
+  String uploadsActive(int count) =>
+      count == 1 ? 'Mengunggah 1 berkas' : 'Mengunggah $count berkas';
 
   @override
   String get savedToFolder => 'Tersimpan di Download/Dropify';
@@ -1041,25 +1047,28 @@ class StringsId extends AppStrings {
       '(API membalas error-notPremium).';
 
   @override
-  String get gofileStartPin => 'Jadikan halaman awal';
-
-  @override
-  String get gofileStartUnpin => 'Hapus halaman awal';
-
-  @override
-  String get gofileStartSaved =>
-      'Folder ini jadi halaman awal Gofile. Buka Gofile lagi untuk langsung ke sini.';
-
-  @override
-  String get gofileStartCleared =>
-      'Halaman awal Gofile dihapus. Aplikasi kembali membuka beranda.';
-
-  @override
-  String get gofileStartNeedsFolder =>
-      'Buka folder dulu, baru bisa dijadikan halaman awal.';
-
-  @override
   String get gofileOpenStart => 'Buka folder utama';
+
+  @override
+  String get gofileUploadBackground =>
+      'Unggahan dilanjutkan aplikasi di latar belakang. Progres ada di Home dan notifikasi.';
+
+  @override
+  String gofileUploadQueued(int count) =>
+      count == 1 ? '1 berkas diunggah di latar belakang' : '$count berkas diunggah di latar belakang';
+
+  @override
+  String get uploadFailed => 'Unggahan gagal';
+
+  @override
+  String get uploadDenied => 'Akun Gofile menolak unggahan ini (token tidak berlaku).';
+
+  @override
+  String get uploadServerUnavailable =>
+      'Server unggah Gofile tidak tersedia. Coba lagi sebentar.';
+
+  @override
+  String get gofileUploadHint => 'Berkas diunggah aplikasi, bukan browser di dalam app.';
 
 }
 
@@ -1231,6 +1240,10 @@ class StringsEn extends AppStrings {
   @override
   String downloadsActive(int count) =>
       count == 1 ? 'Downloading 1 file' : 'Downloading $count files';
+
+  @override
+  String uploadsActive(int count) =>
+      count == 1 ? 'Uploading 1 file' : 'Uploading $count files';
 
   @override
   String get savedToFolder => 'Saved to Download/Dropify';
@@ -1831,24 +1844,28 @@ class StringsEn extends AppStrings {
       '(the API answers error-notPremium).';
 
   @override
-  String get gofileStartPin => 'Set as start page';
-
-  @override
-  String get gofileStartUnpin => 'Remove start page';
-
-  @override
-  String get gofileStartSaved =>
-      'This folder is now the Gofile start page. Next time Gofile opens here.';
-
-  @override
-  String get gofileStartCleared =>
-      'Gofile start page removed. The app opens the home page again.';
-
-  @override
-  String get gofileStartNeedsFolder =>
-      'Open a folder first, then it can be the start page.';
-
-  @override
   String get gofileOpenStart => 'Open main folder';
+
+  @override
+  String get gofileUploadBackground =>
+      'The app keeps uploading in the background. Progress is on Home and in the notification.';
+
+  @override
+  String gofileUploadQueued(int count) => count == 1
+      ? '1 file uploading in the background'
+      : '$count files uploading in the background';
+
+  @override
+  String get uploadFailed => 'Upload failed';
+
+  @override
+  String get uploadDenied => 'Your Gofile account rejected this upload (token not valid).';
+
+  @override
+  String get uploadServerUnavailable =>
+      'Gofile upload server is unavailable. Try again in a moment.';
+
+  @override
+  String get gofileUploadHint => 'Files are uploaded by the app, not the in-app browser.';
 
 }

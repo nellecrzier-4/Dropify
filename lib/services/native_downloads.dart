@@ -45,6 +45,17 @@ class NativeDownloadState {
   }
 }
 
+/// Berkas lokal hasil pemilih Android.
+class LocalFile {
+  const LocalFile({required this.path, required this.name, required this.size});
+
+  final String path;
+  final String name;
+
+  /// Ukuran menurut provider (0 kalau tidak diketahui).
+  final int size;
+}
+
 class NativeDownloadException implements Exception {
   NativeDownloadException(this.message);
   final String message;
@@ -169,6 +180,28 @@ class NativeDownloads {
           .map((e) => e?.toString() ?? '')
           .where((e) => e.isNotEmpty)
           .toList(growable: false);
+    } on PlatformException {
+      return null;
+    } on MissingPluginException {
+      return null;
+    }
+  }
+
+  /// Path nyata + nama + ukuran dari URI pemilih berkas.
+  ///
+  /// Kalau provider tidak memberi path (mis. dokumen di cloud), berkas disalin
+  /// ke cache di sisi native dan path salinan itu yang dikembalikan.
+  static Future<LocalFile?> resolveDocument(String uri) async {
+    try {
+      final res = await _channel
+          .invokeMapMethod<String, dynamic>('resolveDocument', {'uri': uri});
+      final path = res?['path']?.toString() ?? '';
+      if (path.isEmpty) return null;
+      return LocalFile(
+        path: path,
+        name: res?['name']?.toString() ?? path.split('/').last,
+        size: (res?['size'] as num?)?.toInt() ?? 0,
+      );
     } on PlatformException {
       return null;
     } on MissingPluginException {
