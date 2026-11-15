@@ -681,7 +681,7 @@ class _SheetPageState extends State<_SheetPage> {
         child: Opacity(
           opacity: (1 - _drag / 400).clamp(0.4, 1.0),
           child: Padding(
-      padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+      padding: const EdgeInsets.fromLTRB(10, 0, 10, 12),
       child: Material(
         color: Theme.of(context).colorScheme.surfaceContainerLow,
         clipBehavior: Clip.antiAlias,
@@ -689,7 +689,16 @@ class _SheetPageState extends State<_SheetPage> {
           borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
         ),
         child: useSafeArea
-            ? SafeArea(top: false, child: builder(context))
+            // Ruang ekstra di bawah supaya baris terakhir tidak menempel ke
+            // gesture bar / tepi layar.
+            ? SafeArea(
+                top: false,
+                minimum: const EdgeInsets.only(bottom: 10),
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: builder(context),
+                ),
+              )
             : builder(context),
       ),
         ),

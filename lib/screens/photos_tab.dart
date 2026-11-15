@@ -74,7 +74,7 @@ class PhotosTab extends StatelessWidget {
                         ? ListView(
                             key: const ValueKey('empty'),
                             physics: const AlwaysScrollableScrollPhysics(),
-                            padding: const EdgeInsets.fromLTRB(20, 8, 20, 110),
+                            padding: const EdgeInsets.fromLTRB(20, 8, 20, 140),
                             children: [const _EmptyPhotos()],
                           )
                         : GridView.builder(

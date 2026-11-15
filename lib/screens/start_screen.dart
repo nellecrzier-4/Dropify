@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 import '../widgets/anim.dart';
 import '../widgets/kit.dart';
+import '../widgets/motion.dart';
 import '../widgets/wave_progress.dart';
 import 'login_screen.dart';
 import 'setup_screen.dart';
@@ -54,38 +55,88 @@ class _StartScreenState extends State<StartScreen> {
   }
 }
 
-class _BootSplash extends StatelessWidget {
+class _BootSplash extends StatefulWidget {
   const _BootSplash({super.key});
 
   @override
+  State<_BootSplash> createState() => _BootSplashState();
+}
+
+class _BootSplashState extends State<_BootSplash>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+  )..forward();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final mark = CurvedAnimation(
+      parent: _c,
+      curve: const Interval(0, 0.65, curve: Motion.spring),
+    );
+    final text = CurvedAnimation(
+      parent: _c,
+      curve: const Interval(0.35, 1, curve: Motion.emphasized),
+    );
+
     return Scaffold(
       body: OrbBackground(
         child: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Breathing(child: OrbIcon(icon: Icons.cloud_rounded, size: 124)),
-              const SizedBox(height: 30),
-              Text(
-                'Dropify',
-                style: TextStyle(
-                  color: AppColors.text,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -0.4,
+              AnimatedBuilder(
+                animation: mark,
+                builder: (context, child) => Transform.scale(
+                  scale: 0.55 + 0.45 * mark.value.clamp(0.0, 1.2),
+                  child: Opacity(
+                    opacity: mark.value.clamp(0.0, 1.0),
+                    child: child,
+                  ),
                 ),
+                child: const OrbIcon(icon: Icons.cloud_rounded, size: 124),
               ),
               const SizedBox(height: 26),
-              SizedBox(
-                width: 150,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(AppRadii.pill),
-                  child: const WaveProgressBar(
-                    value: 0,
-                    indeterminate: true,
-                    height: 5,
+              AnimatedBuilder(
+                animation: text,
+                builder: (context, child) => Opacity(
+                  opacity: text.value.clamp(0.0, 1.0),
+                  child: Transform.translate(
+                    offset: Offset(0, (1 - text.value) * 10),
+                    child: child,
                   ),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      'Dropify',
+                      style: TextStyle(
+                        color: AppColors.text,
+                        fontSize: 25,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    SizedBox(
+                      width: 132,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(AppRadii.pill),
+                        child: const WaveProgressBar(
+                          value: 0,
+                          indeterminate: true,
+                          height: 5,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],

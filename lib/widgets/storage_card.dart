@@ -96,7 +96,11 @@ class StorageCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 18),
-                  _SegmentBar(stats: visible, total: total),
+                  _SegmentBar(
+                    stats: visible,
+                    total: total,
+                    onTap: onTotalTap,
+                  ),
                 ],
               ),
             ),
@@ -197,7 +201,12 @@ Color barColor(Color c) => Color.lerp(
 class _SegmentBar extends StatelessWidget {
   final List<_Stat> stats;
   final int total;
-  const _SegmentBar({required this.stats, required this.total});
+  final VoidCallback onTap;
+  const _SegmentBar({
+    required this.stats,
+    required this.total,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {

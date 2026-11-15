@@ -142,7 +142,7 @@ class _HomeScreenState extends State<HomeScreen> {
             bottom: 0,
             child: SafeArea(
               top: false,
-              minimum: const EdgeInsets.only(bottom: 8),
+              minimum: const EdgeInsets.only(bottom: 12),
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: GlassNav(
@@ -175,7 +175,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           Positioned(
             right: 20,
-            bottom: 92 + safeBottom,
+            bottom: 118 + safeBottom,
             child: _AddFab(onTap: _showAddMenu, open: _addOpen),
           ),
         ],
