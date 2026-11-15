@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../controllers/drive_controller.dart';
 import '../l10n/locale_controller.dart';
 import '../screens/settings_screen.dart';
+import 'gofile_screen.dart';
 import '../theme/app_theme.dart';
 import '../utils/file_types.dart';
 import '../widgets/file_tile.dart';
@@ -266,6 +267,13 @@ class _Header extends StatelessWidget {
           onSelected: (v) {
             if (v == 'logout') onLogout();
             if (v == 'settings') onSettings();
+            if (v == 'gofile') {
+              Navigator.of(context).push(
+                SharedAxisPageRoute<void>(
+                  builder: (_) => const GofileScreen(),
+                ),
+              );
+            }
           },
           itemBuilder: (_) => [
             PopupMenuItem(
@@ -277,6 +285,17 @@ class _Header extends StatelessWidget {
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
+              ),
+            ),
+            PopupMenuItem(
+              value: 'gofile',
+              child: Row(
+                children: [
+                  Icon(Icons.folder_shared_rounded,
+                      size: 18, color: AppColors.scheme.onSurfaceVariant),
+                  const SizedBox(width: 10),
+                  const Text('Gofile'),
+                ],
               ),
             ),
             PopupMenuItem(

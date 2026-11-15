@@ -37,6 +37,16 @@ abstract class AppStrings {
   String get passwordLabel;
   String get otpLabel;
   String get signIn;
+
+  // Gofile
+  String get gofileSubtitle;
+  String get gofileIntro;
+  String get gofileEmailHint;
+  String get gofileSendLink;
+  String get gofileLinkSent;
+  String get gofilePasteHint;
+  String get gofileGuestNote;
+  String get gofileEmpty;
   String get noAccount;
   String get preparingSession;
   String get fillCredentials;
@@ -982,6 +992,35 @@ class StringsId extends AppStrings {
   @override
   String get downloaderUnavailable =>
       'Downloader Android tidak tersedia di perangkat ini.';
+
+  @override
+  String get gofileSubtitle => 'Akun Gofile';
+
+  @override
+  String get gofileIntro =>
+      'Masukkan email akun Gofile. Kami kirim tautan masuk ke email itu; tempel '
+      'tautannya di sini untuk menyambungkan akun.';
+
+  @override
+  String get gofileEmailHint => 'Email akun Gofile';
+
+  @override
+  String get gofileSendLink => 'Kirim tautan masuk';
+
+  @override
+  String get gofileLinkSent =>
+      'Tautan masuk sudah dikirim. Buka email, salin tautannya, lalu tempel di bawah.';
+
+  @override
+  String get gofilePasteHint => 'Tempel tautan / token dari email';
+
+  @override
+  String get gofileGuestNote =>
+      'Belum punya akun? Gofile bisa dipakai sebagai tamu lewat token guest.';
+
+  @override
+  String get gofileEmpty => 'Belum ada file di akun Gofile ini.';
+
 }
 
 class StringsEn extends AppStrings {
@@ -1711,4 +1750,33 @@ class StringsEn extends AppStrings {
   @override
   String get downloaderUnavailable =>
       'The Android downloader is not available on this device.';
+
+  @override
+  String get gofileSubtitle => 'Gofile account';
+
+  @override
+  String get gofileIntro =>
+      'Enter your Gofile account email. We send a sign-in link to it; paste '
+      'that link here to connect the account.';
+
+  @override
+  String get gofileEmailHint => 'Gofile account email';
+
+  @override
+  String get gofileSendLink => 'Send sign-in link';
+
+  @override
+  String get gofileLinkSent =>
+      'Sign-in link sent. Open the email, copy the link, then paste it below.';
+
+  @override
+  String get gofilePasteHint => 'Paste link / token from the email';
+
+  @override
+  String get gofileGuestNote =>
+      'No account yet? Gofile also works as a guest with a guest token.';
+
+  @override
+  String get gofileEmpty => 'No files in this Gofile account yet.';
+
 }
