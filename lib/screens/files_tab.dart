@@ -15,6 +15,7 @@ import '../services/gofile_api.dart';
 import '../utils/file_types.dart';
 import 'gofile_screen.dart';
 import 'gofile_web_screen.dart';
+import 'filebin_screen.dart';
 import '../widgets/kit.dart';
 import '../widgets/motion.dart';
 import 'file_list_screen.dart';
@@ -99,6 +100,19 @@ class _FilesTabState extends State<FilesTab> {
                   // Sesuai permintaan: menekan Gofile langsung membuka WebView
                   // di beranda gofile.io, memakai sesi akun yang sudah masuk.
                   onTap: () => _openWeb(context, 'https://gofile.io/'),
+                ),
+                const SizedBox(width: 8),
+                SoftChip(
+                  icon: Icons.timer_outlined,
+                  label: 'Filebin',
+                  selected: false,
+                  // Berbagi sementara tanpa akun: satu bin = satu folder,
+                  // tautannya berlaku 6 hari.
+                  onTap: () => Navigator.of(context).push(
+                    SharedAxisPageRoute<void>(
+                      builder: (_) => const FilebinScreen(),
+                    ),
+                  ),
                 ),
               ],
             ),
