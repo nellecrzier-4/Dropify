@@ -847,9 +847,23 @@ class GlassNav extends StatelessWidget {
                         width: segment - 4,
                         child: DecoratedBox(
                           decoration: BoxDecoration(
-                            color: scheme.secondaryContainer,
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                scheme.primaryContainer,
+                                scheme.secondaryContainer,
+                              ],
+                            ),
                             borderRadius:
                                 BorderRadius.circular(AppRadii.pill),
+                            boxShadow: [
+                              BoxShadow(
+                                color: scheme.primary.withValues(alpha: 0.22),
+                                blurRadius: 14,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -909,10 +923,12 @@ class _NavItem extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              AnimatedScale(
-                scale: selected ? 1 : 0.94,
-                duration: Motion.base,
-                curve: Motion.spring,
+              TweenAnimationBuilder<double>(
+                tween: Tween<double>(begin: 0.9, end: selected ? 1.06 : 0.94),
+                duration: const Duration(milliseconds: 420),
+                curve: Curves.easeOutBack,
+                builder: (context, value, child) =>
+                    Transform.scale(scale: value, child: child),
                 child: Icon(
                   selected ? (item.activeIcon ?? item.icon) : item.icon,
                   size: 22,
@@ -935,7 +951,8 @@ class _NavItem extends StatelessWidget {
                           style: TextStyle(
                             color: scheme.onSecondaryContainer,
                             fontSize: 13,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.1,
                           ),
                         ),
                       )

@@ -24,7 +24,7 @@ class ProxyService extends ChangeNotifier {
   static const List<String> autoCountries = ['SG', 'ID', 'JP'];
 
   /// Jumlah maksimum proxy hasil uji yang disimpan untuk diputar.
-  static const int _maxPool = 16;
+  static const int _maxPool = 24;
 
   static const String _autoFeed =
       'https://api.proxyscrape.com/v4/free-proxy-list/get'
@@ -94,6 +94,32 @@ class ProxyService extends ChangeNotifier {
   ///
   /// Hanya proxy yang benar-benar bisa meneruskan permintaan HTTPS yang
   /// disimpan. Hasilnya di memori saja — tidak ditulis ke penyimpanan.
+  /// Ambil kandidat proxy (SG/ID/JP) tanpa diuji — untuk layar pemilih, supaya
+  /// pengguna bisa memilih sendiri kalau pengujian otomatis gagal.
+  Future<List<String>> fetchCandidates({int perCountry = 14}) async {
+    final out = <String>[];
+    for (final cc in autoCountries) {
+      final list = await _fetchCountry(cc);
+      for (final item in list.take(perCountry)) {
+        if (!out.contains(item)) out.add(item);
+      }
+    }
+    return out;
+  }
+
+  /// Pilih satu proxy secara manual (langsung dipakai).
+  Future<void> useSingle(String proxy) async {
+    _proxies = [proxy];
+    _index = 0;
+    _enabled = true;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_keyList, _proxies);
+    await prefs.setInt(_keyIndex, _index);
+    await prefs.setBool(_keyEnabled, true);
+    await prefs.setBool(_keyAuto, false);
+  }
+
   Future<int> refreshAuto() async {
     if (_refreshing) return _autoPool.length;
     _refreshing = true;

@@ -10,6 +10,7 @@ import '../services/cache_cleaner.dart';
 import '../services/native_downloads.dart';
 import '../services/pixeldrain_bypass.dart';
 import '../services/proxy_service.dart';
+import 'proxy_picker_screen.dart';
 import '../theme/app_theme.dart';
 import '../theme/theme_controller.dart';
 import '../utils/file_types.dart';
@@ -510,6 +511,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                       .isBatteryOptimized();
                                   if (mounted) setState(() => _batteryOk = ok);
                                 },
+                                trailing: const _Chevron(),
+                              ),
+                              const _RowDivider(),
+                              _SettingRow(
+                                icon: Icons.list_alt_rounded,
+                                title: 'Pilih proxy',
+                                subtitle: '24 alamat SG/ID/Jepang · dengan pencarian',
+                                onTap: () => Navigator.of(context).push(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => const ProxyPickerScreen(),
+                                  ),
+                                ),
                                 trailing: const _Chevron(),
                               ),
                               const _RowDivider(),
