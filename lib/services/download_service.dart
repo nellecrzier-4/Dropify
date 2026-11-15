@@ -282,7 +282,21 @@ class DownloadService extends ChangeNotifier {
     if (urlOverride != null && _useSystemDownloader) {
       final handled = await _runSystemDownload(task, urlOverride, headers);
       if (handled) return task;
-      _log('native', '${task.name}: DownloadManager tidak tersedia, pakai downloader app');
+
+      // DownloadManager tidak tersedia. Unduhan besar lewat proses aplikasi
+      // pernah membuat sistem kehabisan I/O dan aplikasi lain ikut mati, jadi
+      // hanya berkas kecil yang boleh memakai jalur cadangan.
+      final probe = await _probeUrl(urlOverride, headers);
+      if (probe.size > 2 * 1024 * 1024 * 1024) {
+        task
+          ..status = DownloadStatus.error
+          ..error = _s.systemDownloaderRequired
+          ..endedAt = DateTime.now();
+        _log('native', '${task.name}: ${probe.size} byte, unduhan sistem gagal dipakai');
+        _notify();
+        return task;
+      }
+      _log('native', '${task.name}: pakai downloader app (${probe.size} byte)');
     }
 
     await _resolveAndRun(task);
@@ -614,6 +628,17 @@ class DownloadService extends ChangeNotifier {
       return;
     }
 
+    // Cek ruang: menulis berkas 11 GB di penyimpanan penuh membuat aplikasi
+    // lain ikut berhenti. Lebih baik berhenti dengan pesan jelas.
+    if (knownSize > 0) {
+      final free = await NativeDownloads.freeSpace();
+      if (free > 0 && free < knownSize + 512 * 1024 * 1024) {
+        _log('space', '${task.name}: butuh $knownSize, sisa $free');
+        _fail(task, 'storage_full');
+        return;
+      }
+    }
+
     final target = await _uniqueFile(dir, task.name);
     final part = File('${target.path}.part');
 
@@ -697,7 +722,9 @@ class DownloadService extends ChangeNotifier {
       title: task.name,
       text: '',
       progress: 0,
-      error: message == 'storage_permission' ? _s.fileAccessRequired : message,
+      error: message == 'storage_permission'
+          ? _s.fileAccessRequired
+          : (message == 'storage_full' ? _s.storageFull : message),
     );
     _notify();
   }
@@ -1123,6 +1150,12 @@ class DownloadService extends ChangeNotifier {
   String _friendlyError(Object? error) {
     if (error == null) return _s.downloadFailed;
     if (error is PixeldrainException) return error.message;
+    if (error is FileSystemException) {
+      final text = error.toString();
+      if (text.contains('ENOSPC') || text.contains('No space left')) {
+        return _s.storageFull;
+      }
+    }
     if (error is _RetryableError) return error.message;
     if (error is DioException) {
       final code = error.response?.statusCode ?? 0;

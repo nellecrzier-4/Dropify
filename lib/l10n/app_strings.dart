@@ -259,6 +259,8 @@ abstract class AppStrings {
   String get downloadFailed;
   String get downloadRestartLoop;
   String get reconnecting;
+  String get storageFull;
+  String get systemDownloaderRequired;
   String get fileNotFoundOnPixeldrain;
   String get downloadBlocked;
   String get downloadDenied;
@@ -951,6 +953,14 @@ class StringsId extends AppStrings {
 
   @override
   String get reconnecting => 'Menyambung ulang…';
+
+  @override
+  String get storageFull => 'Penyimpanan tidak cukup untuk berkas ini.';
+
+  @override
+  String get systemDownloaderRequired =>
+      'Unduhan sistem Android tidak bisa dipakai untuk berkas sebesar ini. '
+      'Coba lagi setelah aplikasi dijalankan ulang.';
 
   @override
   String get downloadFailed => 'Download gagal.';
@@ -1753,6 +1763,14 @@ class StringsEn extends AppStrings {
 
   @override
   String get reconnecting => 'Reconnecting…';
+
+  @override
+  String get storageFull => 'Not enough storage for this file.';
+
+  @override
+  String get systemDownloaderRequired =>
+      'Android\'s system downloader is unavailable for a file this large. '
+      'Try again after restarting the app.';
 
   @override
   String get downloadFailed => 'Download failed.';

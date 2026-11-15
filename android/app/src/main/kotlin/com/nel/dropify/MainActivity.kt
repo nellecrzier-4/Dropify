@@ -318,6 +318,7 @@ class MainActivity : FlutterActivity() {
                             }
                             result.success(true)
                         }
+                        "freeSpace" -> result.success(freeSpace())
                         "resolveDocument" -> resolveDocument(
                             call.argument<String>("uri"),
                             result,
@@ -335,6 +336,14 @@ class MainActivity : FlutterActivity() {
                     result.error("native_error", e.message ?: e.toString(), null)
                 }
             }
+    }
+
+    /** Ruang kosong penyimpanan bersama (byte); -1 kalau tidak terbaca. */
+    private fun freeSpace(): Long = try {
+        val stat = android.os.StatFs(Environment.getExternalStorageDirectory().absolutePath)
+        stat.availableBytes
+    } catch (e: Exception) {
+        -1L
     }
 
     private fun headersFrom(raw: Map<String, String>?): Map<String, String> =

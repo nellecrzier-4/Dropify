@@ -209,6 +209,17 @@ class NativeDownloads {
     }
   }
 
+  /// Ruang kosong di penyimpanan bersama (byte); -1 kalau tidak diketahui.
+  static Future<int> freeSpace() async {
+    try {
+      final res = await _channel.invokeMethod<Object?>('freeSpace');
+      if (res is num) return res.toInt();
+      return -1;
+    } catch (_) {
+      return -1;
+    }
+  }
+
   static Future<void> scanFile(String path) async {
     try {
       await _channel.invokeMethod<bool>('scanFile', {'path': path});
