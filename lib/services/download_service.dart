@@ -69,6 +69,10 @@ class DownloadTask {
 
   /// true kalau unduhan dipegang DownloadManager Android, bukan proses aplikasi.
   bool viaSystem = false;
+
+  /// Id DownloadManager (untuk melanjutkan pemantauan setelah aplikasi dibuka
+  /// lagi). Null kalau unduhan ditangani proses aplikasi.
+  int? dmId;
   bool viaBypass = false;
   String? bypassError;
   int attempts = 0;
@@ -385,18 +389,28 @@ class DownloadService extends ChangeNotifier {
       return task;
     }
 
-    if (urlOverride != null && _useSystemDownloader) {
-      // Dua-duanya berjalan di luar Dart. DownloadManager lebih kuat: proses
-      // sistem yang tetap jalan walau aplikasi ditutup. Kalau tidak tersedia,
-      // FileDownloader native dipakai (juga tanpa menulis dari Dart).
-      if (await _runSystemDownload(task, urlOverride, headers)) return task;
-      if (await _runNativeDownload(task, urlOverride, headers)) return task;
-      task
-        ..status = DownloadStatus.error
-        ..error = _s.downloaderUnavailable
-        ..endedAt = DateTime.now();
-      _notify();
-      return task;
+    if (_useSystemDownloader) {
+      // Semua unduhan diserahkan ke DownloadManager Android: berjalan di proses
+      // sistem, lanjut walau aplikasi ditutup, dan bisa dipantau ulang setelah
+      // aplikasi dibuka kembali.
+      final url = urlOverride ?? task.directUrl;
+      final merged = <String, String>{...task.directHeaders, ...headers};
+      if (headers.isNotEmpty) {
+        // Header sesi (cookie) menang atas header API.
+        merged.addAll(headers);
+      }
+      if (await _runSystemDownload(task, url, merged)) return task;
+      _log('native', '${task.name}: DownloadManager tidak tersedia');
+
+      if (urlOverride != null) {
+        if (await _runNativeDownload(task, urlOverride, headers)) return task;
+        task
+          ..status = DownloadStatus.error
+          ..error = _s.downloaderUnavailable
+          ..endedAt = DateTime.now();
+        _notify();
+        return task;
+      }
     }
 
     await _resolveAndRun(task);
@@ -432,21 +446,26 @@ class DownloadService extends ChangeNotifier {
     task
       ..status = DownloadStatus.downloading
       ..viaSystem = true
+      ..dmId = handle.id
       ..path = handle.path
       ..startedAt = DateTime.now()
       ..url = url;
     _log('native', '${task.name}: DownloadManager #${handle.id}');
     _notify();
+    return _pollSystemDownload(task, handle.id);
+  }
 
+  /// Pantau tugas DownloadManager sampai selesai/gagal.
+  Future<bool> _pollSystemDownload(DownloadTask task, int dmId) async {
     var missing = 0;
 
     while (!_disposed) {
       if (task.canceled) {
-        await NativeDownloads.cancel(handle.id);
+        await NativeDownloads.cancel(dmId);
         return true;
       }
       await Future<void>.delayed(const Duration(seconds: 1));
-      final state = await NativeDownloads.query(handle.id);
+      final state = await NativeDownloads.query(dmId);
       if (state == null) {
         if (++missing >= 3) {
           task
@@ -622,14 +641,15 @@ class DownloadService extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       final data = <Map<String, dynamic>>[
         for (final t in tasks)
-          if (t.urlOverride != null && t.isActive && t.size > 0)
+          if (t.isActive && t.size > 0)
             {
               'key': t.key,
               'name': t.name,
-              'url': t.urlOverride,
+              'url': t.urlOverride ?? t.url,
               'size': t.size,
               'received': t.received,
               'headers': t.extraHeaders,
+              'dmId': t.dmId,
             },
       ];
       if (data.isEmpty) {
@@ -674,7 +694,9 @@ class DownloadService extends ChangeNotifier {
           notifyId: 4200 + _seq++,
           urlOverride: url,
           extraHeaders: headers,
-        )..size = (entry['size'] as num?)?.toInt() ?? 0;
+        )
+          ..size = (entry['size'] as num?)?.toInt() ?? 0
+          ..dmId = (entry['dmId'] as num?)?.toInt();
         tasks.insert(0, task);
         resumed.add(task);
       }
@@ -691,6 +713,17 @@ class DownloadService extends ChangeNotifier {
   }
 
   Future<void> _resumeTask(DownloadTask task) async {
+    final dmId = task.dmId;
+    if (dmId != null) {
+      // Unduhan sistem masih berjalan: cukup sambungkan kembali pemantauannya.
+      _log('resume', '${task.name}: sambung DownloadManager #$dmId');
+      task
+        ..status = DownloadStatus.downloading
+        ..viaSystem = true;
+      _notify();
+      await _pollSystemDownload(task, dmId);
+      return;
+    }
     if (!await _ensureStorage()) {
       _fail(task, 'storage_permission');
       return;
