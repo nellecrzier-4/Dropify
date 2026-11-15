@@ -388,7 +388,9 @@ class _DownloadsTab extends StatelessWidget {
               const SizedBox(height: 10),
               ...staggered(
                 <Widget>[
-                  if (task.error == 'captcha_required')
+                  if (task.error != null &&
+                      (task.error!.contains('captcha') ||
+                          task.error!.contains('403')))
                     _DetailAction(
                       icon: Icons.verified_user_outlined,
                       title: 'Verifikasi captcha',

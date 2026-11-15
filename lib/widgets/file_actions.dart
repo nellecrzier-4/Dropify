@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../screens/pd_captcha_screen.dart';
+
 import '../controllers/drive_controller.dart';
 import '../l10n/locale_controller.dart';
 import '../models/pd_item.dart';
@@ -85,21 +87,27 @@ Future<void> downloadItem(
   }
 
   final forbidden = (task.error?.contains('403') ?? false) ||
+      (task.error?.contains('captcha') ?? false) ||
       task.error == 'pixeldrain_rate_limited';
-  final fileId = (item.id ?? '').trim();
+  final fileId = (item.id ?? '').trim().isNotEmpty
+      ? item.id!.trim()
+      : (fileIdFromUrl(task.directUrl) ?? '');
 
   showAppSnack(
     context,
     text,
-    // Kalau server menolak (403), tawarkan buka di browser sebagai jalan lain.
+    // Kalau server menolak (403/captcha), tawarkan verifikasi di halaman resmi:
+    // pengguna menyelesaikan sendiri, aplikasi menyimpan sesinya lalu mengulang.
     action: SnackBarAction(
-      label: forbidden && fileId.isNotEmpty ? s.browser : s.downloads,
-      onPressed: () {
+      label: forbidden && fileId.isNotEmpty ? 'Verifikasi' : s.downloads,
+      onPressed: () async {
         if (forbidden && fileId.isNotEmpty) {
-          launchUrl(
-            Uri.parse('https://pixeldrain.com/u/$fileId'),
-            mode: LaunchMode.externalApplication,
+          final ok = await Navigator.of(context).push<bool>(
+            MaterialPageRoute<bool>(
+              builder: (_) => PdCaptchaScreen(fileId: fileId),
+            ),
           );
+          if (ok == true) await ctrl.downloads.retry(task.id);
         } else {
           showTransfers(context, ctrl);
         }
