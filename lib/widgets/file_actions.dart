@@ -85,12 +85,25 @@ Future<void> downloadItem(
     text = s.downloadStartedSnack(task.name);
   }
 
+  final forbidden = task.error?.contains('403') ?? false;
+  final fileId = (item.id ?? '').trim();
+
   showAppSnack(
     context,
     text,
+    // Kalau server menolak (403), tawarkan buka di browser sebagai jalan lain.
     action: SnackBarAction(
-      label: s.downloads,
-      onPressed: () => showTransfers(context, ctrl),
+      label: forbidden && fileId.isNotEmpty ? 'Browser' : s.downloads,
+      onPressed: () {
+        if (forbidden && fileId.isNotEmpty) {
+          launchUrl(
+            Uri.parse('https://pixeldrain.com/u/$fileId'),
+            mode: LaunchMode.externalApplication,
+          );
+        } else {
+          showTransfers(context, ctrl);
+        }
+      },
     ),
   );
 }

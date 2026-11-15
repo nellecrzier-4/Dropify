@@ -124,6 +124,15 @@ class _RetryableError implements Exception {
   final String message;
 }
 
+/// Header yang menyerupai browser. Sebagian CDN/mirror membalas 403 untuk
+/// request tanpa User-Agent atau tanpa Referer.
+const Map<String, String> _browserHeaders = {
+  'User-Agent':
+      'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 '
+          '(KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
+  'Referer': 'https://pixeldrain.com/',
+};
+
 /// Server mengabaikan header Range (balas 200, bukan 206).
 class _RangeUnsupported implements Exception {}
 
@@ -678,6 +687,7 @@ class DownloadService extends ChangeNotifier {
           url,
           options: Options(
             headers: {
+              ..._browserHeaders,
               'Accept': '*/*',
               'Range': 'bytes=$from-${chunk.end}',
               if (!task.viaBypass) ...task.directHeaders,
@@ -791,7 +801,7 @@ class DownloadService extends ChangeNotifier {
       start = 0;
     }
 
-    final headers = <String, String>{'Accept': '*/*'};
+    final headers = <String, String>{..._browserHeaders, 'Accept': '*/*'};
     if (start > 0) headers['Range'] = 'bytes=$start-';
     if (!task.viaBypass) headers.addAll(task.directHeaders);
 
@@ -919,7 +929,11 @@ class DownloadService extends ChangeNotifier {
     if (error is DioException) {
       final code = error.response?.statusCode ?? 0;
       if (code == 404) return 'File tidak ditemukan di Pixeldrain.';
-      if (code == 401 || code == 403) return 'Akses file ditolak (HTTP $code).';
+      if (code == 403) {
+        return 'Server menolak (HTTP 403) — biasanya batas unduhan Pixeldrain '
+            'sudah tercapai atau file dibatasi. Coba lagi nanti / buka di browser.';
+      }
+      if (code == 401) return 'Akses file ditolak (HTTP 401).';
       if (code == 429) return 'Server masih membatasi. Coba lagi nanti.';
       if (code >= 500) return 'Server download bermasalah (HTTP $code).';
       switch (error.type) {
@@ -951,7 +965,7 @@ class DownloadService extends ChangeNotifier {
       final res = await _dio.head(
         url,
         options: Options(
-          headers: {...headers, 'Accept': '*/*'},
+          headers: {..._browserHeaders, ...headers, 'Accept': '*/*'},
           receiveTimeout: const Duration(seconds: 15),
           validateStatus: (_) => true,
         ),
@@ -970,8 +984,9 @@ class DownloadService extends ChangeNotifier {
           ranges: ranges,
         );
       }
-      if (code == 405 || code == 501) {
-        // Sebagian server menolak HEAD; coba Range 0-0.
+      if (code == 400 || code == 403 || code == 405 || code == 501) {
+        // Sebagian server menolak HEAD atau request tanpa header browser;
+        // coba GET dengan Range 0-0.
         return _probeRange(url, headers);
       }
       return ProbeResult.fail('HTTP $code');

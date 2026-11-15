@@ -9,6 +9,17 @@ android {
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
+    // Keystore ikut repo supaya APK dari CI maupun build lokal memakai tanda
+    // tangan yang sama -> update bisa dipasang tanpa uninstall.
+    signingConfigs {
+        release {
+            storeFile file("dropify-release.jks")
+            storePassword "dropify123"
+            keyAlias "dropify"
+            keyPassword "dropify123"
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -24,7 +35,7 @@ android {
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.debug
+            signingConfig = signingConfigs.release
         }
     }
 
