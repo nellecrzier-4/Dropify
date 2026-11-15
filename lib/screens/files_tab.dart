@@ -12,6 +12,7 @@ import '../services/download_service.dart';
 import '../services/gofile_api.dart';
 import '../utils/file_types.dart';
 import 'gofile_screen.dart';
+import 'gofile_web_screen.dart';
 import '../widgets/kit.dart';
 import '../widgets/motion.dart';
 import 'file_list_screen.dart';
@@ -121,6 +122,14 @@ class _GofileBrowserState extends State<_GofileBrowser> {
     super.dispose();
   }
 
+  void _openWeb(BuildContext context, [String? url]) {
+    Navigator.of(context).push(
+      SharedAxisPageRoute<void>(
+        builder: (_) => GofileWebScreen(url: url),
+      ),
+    );
+  }
+
   Widget _linkBar(BuildContext context, GofileController ctrl) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 2, 20, 8),
@@ -140,7 +149,19 @@ class _GofileBrowserState extends State<_GofileBrowser> {
           ),
           const SizedBox(width: 8),
           IconButton.filledTonal(
-            onPressed: () => ctrl.openShare(_link.text),
+            onPressed: () {
+              // Gofile membatasi API untuk akun gratis; buka lewat web resmi
+              // di dalam app supaya isi tetap bisa diakses.
+              final text = _link.text.trim();
+              if (text.isEmpty) {
+                _openWeb(context);
+              } else {
+                _openWeb(
+                  context,
+                  text.startsWith('http') ? text : 'https://gofile.io/d/$text',
+                );
+              }
+            },
             icon: const Icon(Icons.arrow_forward_rounded),
           ),
         ],
