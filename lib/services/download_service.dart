@@ -28,6 +28,7 @@ class DownloadTask {
     required this.directHeaders,
     required this.notifyId,
     this.urlOverride,
+    this.extraHeaders = const {},
     int sizeHint = 0,
   }) : size = sizeHint;
 
@@ -40,6 +41,10 @@ class DownloadTask {
 
   /// Link bypass siap pakai (dipakai saat download dari link orang lain).
   final String? urlOverride;
+
+  /// Header tambahan untuk URL di luar Pixeldrain (mis. Cookie sesi WebView
+  /// Gofile). Selalu ikut dikirim, termasuk saat [urlOverride] dipakai.
+  final Map<String, String> extraHeaders;
 
   String name;
   int size;
@@ -203,6 +208,11 @@ class DownloadService extends ChangeNotifier {
   final String? _folderOverride;
   final Dio _dio;
 
+  /// Instance yang dipakai layar utama (pill HomeTab + sheet Transfers).
+  /// Diisi oleh [DriveController] supaya unduhan yang dimulai dari layar lain
+  /// (mis. WebView Gofile) muncul di tempat yang sama.
+  static DownloadService? shared;
+
   final List<DownloadTask> tasks = <DownloadTask>[];
 
   int _seq = 0;
@@ -214,11 +224,19 @@ class DownloadService extends ChangeNotifier {
 
   String get folderPath => _folderOverride ?? NativeDownloads.folderPath;
 
-  Future<DownloadTask?> download(PdItem item, {String? urlOverride}) async {
+  Future<DownloadTask?> download(
+    PdItem item, {
+    String? urlOverride,
+    Map<String, String> headers = const {},
+  }) async {
     if (item.isDir) return null;
 
     final fileId = (item.id ?? '').trim();
-    final key = fileId.isNotEmpty ? 'id:$fileId' : 'fs:${item.fsPath.join('/')}';
+    // Unduhan dari URL luar (Gofile/WebView) tidak punya id Pixeldrain: kuncinya
+    // URL itu sendiri, supaya dua berkas berbeda tidak saling menimpa.
+    final key = urlOverride != null
+        ? 'url:$urlOverride'
+        : (fileId.isNotEmpty ? 'id:$fileId' : 'fs:${item.fsPath.join('/')}');
     for (final t in tasks) {
       if (t.key == key && t.isActive) return t;
     }
@@ -232,6 +250,7 @@ class DownloadService extends ChangeNotifier {
       directHeaders: api.authHeaders,
       notifyId: 4200 + _seq++,
       urlOverride: urlOverride,
+      extraHeaders: headers,
       sizeHint: item.size,
     );
 
@@ -341,7 +360,7 @@ class DownloadService extends ChangeNotifier {
 
     final override = task.urlOverride;
     if (override != null) {
-      final probe = await _probeUrl(override, const {});
+      final probe = await _probeUrl(override, task.extraHeaders);
       if (_disposed || task.canceled) return;
       if (probe.ok) {
         await _run(
@@ -706,6 +725,7 @@ class DownloadService extends ChangeNotifier {
               ..._browserHeaders,
               'Accept': '*/*',
               'Range': 'bytes=$from-${chunk.end}',
+              ...task.extraHeaders,
               if (!task.viaBypass) ...task.directHeaders,
             },
             responseType: ResponseType.stream,
@@ -819,6 +839,7 @@ class DownloadService extends ChangeNotifier {
 
     final headers = <String, String>{..._browserHeaders, 'Accept': '*/*'};
     if (start > 0) headers['Range'] = 'bytes=$start-';
+    headers.addAll(task.extraHeaders);
     if (!task.viaBypass) headers.addAll(task.directHeaders);
 
     final token = CancelToken();

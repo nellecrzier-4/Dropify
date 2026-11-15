@@ -18,6 +18,7 @@ class _FakeAdapter implements HttpClientAdapter {
   final bool truncateFirst;
   int calls = 0;
   final List<String?> requestedRanges = [];
+  final List<Map<String, dynamic>> headersSeen = [];
 
   @override
   Future<ResponseBody> fetch(
@@ -27,6 +28,7 @@ class _FakeAdapter implements HttpClientAdapter {
   ) async {
     final rangeHeader = options.headers['Range'] as String?;
     requestedRanges.add(rangeHeader);
+    headersSeen.add(Map<String, dynamic>.from(options.headers));
 
     var start = 0;
     var status = 200;
@@ -220,6 +222,86 @@ void main() {
     expect(task.viaBypass, isFalse);
     expect(task.status, DownloadStatus.done, reason: task.error ?? '');
     expect(await File(task.path!).length(), 2048);
+
+    service.dispose();
+    await dir.delete(recursive: true);
+  });
+
+  test('URL luar (WebView Gofile) diunduh lewat urlOverride', () async {
+    final dir = await Directory.systemTemp.createTemp('dropify_dl');
+    final adapter = _FakeAdapter(total: 64 * 1024);
+    final service = await makeService(adapter, dir);
+
+    final task = await service.download(
+      const PdItem(name: 'berkas goweb.bin', size: 0),
+      urlOverride:
+          'https://store-eu-par-1.gofile.io/download/web/tok/berkas%20goweb.bin',
+      headers: const {'Cookie': 'accountToken=abc'},
+    );
+    await waitDone(task!);
+
+    expect(task.status, DownloadStatus.done, reason: task.error ?? '');
+    expect(task.viaBypass, isTrue, reason: 'URL luar bukan jalur bypass');
+    expect(task.url, contains('gofile.io'));
+    expect(await File(task.path!).length(), 64 * 1024);
+    expect(
+      adapter.headersSeen.any((h) => h['Cookie'] == 'accountToken=abc'),
+      isTrue,
+      reason: 'cookie sesi WebView harus ikut terkirim',
+    );
+
+    service.dispose();
+    await dir.delete(recursive: true);
+  });
+
+  test('dua URL luar berbeda tidak saling menimpa', () async {
+    final dir = await Directory.systemTemp.createTemp('dropify_dl');
+    final adapter = _FakeAdapter(total: 64 * 1024);
+    final service = await makeService(adapter, dir);
+
+    final first = service.download(
+      const PdItem(name: 'satu.bin', size: 0),
+      urlOverride: 'https://store-eu-par-1.gofile.io/download/web/a/satu.bin',
+    );
+    final second = service.download(
+      const PdItem(name: 'dua.bin', size: 0),
+      urlOverride: 'https://store-eu-par-1.gofile.io/download/web/b/dua.bin',
+    );
+
+    final a = await first;
+    final b = await second;
+    await waitDone(a!);
+    await waitDone(b!);
+
+    expect(a.id, isNot(b.id), reason: 'kunci tugas harus unik per URL');
+    expect(a.status, DownloadStatus.done, reason: a.error ?? '');
+    expect(b.status, DownloadStatus.done, reason: b.error ?? '');
+    expect(File(a.path!).parent.path, dir.path);
+    expect(File(b.path!).parent.path, dir.path);
+
+    service.dispose();
+    await dir.delete(recursive: true);
+  });
+
+  test('URL yang sama saat masih aktif dipakai bersama', () async {
+    final dir = await Directory.systemTemp.createTemp('dropify_dl');
+    final adapter = _FakeAdapter(total: 64 * 1024);
+    final service = await makeService(adapter, dir);
+    const url = 'https://store-eu-par-1.gofile.io/download/web/c/sama.bin';
+
+    final first = service.download(
+      const PdItem(name: 'sama.bin', size: 0),
+      urlOverride: url,
+    );
+    final second = service.download(
+      const PdItem(name: 'sama.bin', size: 0),
+      urlOverride: url,
+    );
+    final a = await first;
+    final b = await second;
+    await waitDone(a!);
+
+    expect(b!.id, a.id, reason: 'klik ganda tidak boleh membuat dua unduhan');
 
     service.dispose();
     await dir.delete(recursive: true);

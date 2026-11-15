@@ -32,7 +32,11 @@ class UploadTask {
 
 /// State utama aplikasi: daftar file dari Pixeldrain + status sync + upload.
 class DriveController extends ChangeNotifier {
-  DriveController(this.api) : downloads = DownloadService(api);
+  DriveController(this.api) : downloads = DownloadService(api) {
+    // Unduhan dari layar lain (WebView Gofile) memakai instance yang sama,
+    // supaya pill HomeTab dan sheet Transfers menampilkannya.
+    DownloadService.shared = downloads;
+  }
 
   final PixeldrainApi api;
 
@@ -178,6 +182,9 @@ class DriveController extends ChangeNotifier {
 
   @override
   void dispose() {
+    if (identical(DownloadService.shared, downloads)) {
+      DownloadService.shared = null;
+    }
     downloads.dispose();
     super.dispose();
   }
