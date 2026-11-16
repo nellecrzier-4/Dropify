@@ -23,7 +23,7 @@ class ProxyCatalog {
 
   /// Maksimal [limit] alamat, dibagi dari tiga negara di atas.
   static Future<List<ProxyCandidate>> fetch({int limit = 24}) async {
-    final perCountry = (limit / countries.length).ceil() + 2;
+    final perCountry = (limit / countries.length).ceil() + 6;
     final out = <ProxyCandidate>[];
     for (final cc in countries) {
       final list = await _one(cc);
@@ -74,9 +74,11 @@ class ProxyCatalog {
       final out = <String>[];
       for (final raw in body.split('\n')) {
         final line = raw.trim();
-        // Ambil hanya proxy HTTP/HTTPS; SOCKS tidak didukung findProxy Dart.
-        if (line.startsWith('socks')) continue;
-        final plain = line.replaceFirst(RegExp(r'^https?://'), '');
+        // Hanya proxy HTTP biasa yang didukung findProxy Dart. SOCKS dan
+        // proxy TLS (https://host:port) dibuang — keduanya tidak akan pernah
+        // bisa dipakai, dan itulah sumber "banyak yang gagal" sebelumnya.
+        if (!line.startsWith('http://')) continue;
+        final plain = line.substring('http://'.length);
         if (_valid(plain) && !out.contains(plain)) out.add(plain);
       }
       return out;
